@@ -35,6 +35,83 @@ implementation for the platform:
 
 [pcanvas_flutter]: https://pub.dev/packages/pcanvas_flutter
 
+## Usage
+
+```dart
+import 'package:pcanvas/pcanvas.dart';
+
+void main() async {
+  // Create a canvas of dimension 800x600:
+  var pCanvas = PCanvas(800, 600, MyCanvasPainter());
+
+  // Wait the canvas to load:
+  await pCanvas.waitLoading();
+
+  // Paint the canvas:
+  pCanvas.callPainter();
+
+  // Get the canvas pixels:
+  var pixels = await pCanvas.pixels;
+
+  // Convert the canvas to a PNG:
+  var pngData = await pCanvas.toPNG();
+  
+  //...
+}
+
+class MyCanvasPainter extends PCanvasPainter {
+  late PCanvasImage img1;
+  
+  @override
+  Future<bool> loadResources(PCanvas pCanvas) async {
+    var img1URL = 'https://i.postimg.cc/k5TnC1H9/land-scape-1.jpg';
+  
+    pCanvas.log('** Loading image...');
+    img1 = pCanvas.createCanvasImage(img1URL);
+
+    await img1.load();
+    pCanvas.log('** Image loaded: $img1');
+
+    return true;
+  }
+
+  @override
+  bool paint(PCanvas pCanvas) {
+    // Clear the canvas with `colorGrey`:
+    pCanvas.clear(style: PStyle(color: PColor.colorGrey));
+
+    // Draw an image fitting the target area:
+    pCanvas.drawImageFitted(img1, 0, 0, pCanvas.width ~/ 2, pCanvas.height);
+    
+    // Fill a rectangle at (10,10):
+    pCanvas.fillRect(
+        10, 10, 20, 20, PStyle(color: PColor.colorRed.copyWith(alpha: 0.30)));
+
+    // Fill a rectangle at (40,10):
+    pCanvas.fillRect(40, 10, 20, 20, PStyle(color: PColor.colorGreen));
+
+    var font = PFont('Arial', 14);
+    var text = 'Canvas pixelRatio: ${pCanvas.pixelRatio}';
+
+    // Measure `text`:
+    var m = pCanvas.measureText(text, font);
+
+    // Draw `text` at (10,55):
+    pCanvas.drawText(text, 10, 55, font, PStyle(color: PColor.colorBlack));
+
+    // Stroke a rectangle around the `text`:
+    pCanvas.strokeRect(10 - 2, 55 - 2, m.actualWidth + 4, m.actualHeight + 4,
+        PStyle(color: PColor.colorYellow));
+
+    // Stroke a `path`:
+    pCanvas.strokePath([100, 10, 130, 25, 100, 40], PStyle(color: PColor.colorRed, size: 3),
+        closePath: true);
+
+    return true;
+  }
+}
+```
+
 ## Examples
 
 See the usage examples at:

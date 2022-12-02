@@ -144,13 +144,16 @@ abstract class PCanvasPainter {
 }
 
 /// Portable Canvas.
-abstract class PCanvas {
+abstract class PCanvas with WithDimension {
+  /// The painter of this canvas.
   PCanvasPainter get painter;
 
   /// The pixels width of this canvas.
+  @override
   num get width;
 
   /// The pixels height of this canvas.
+  @override
   num get height;
 
   /// The width of the visual element.
@@ -175,6 +178,7 @@ abstract class PCanvas {
   PDimension get elementDimension => PDimension(elementWidth, elementHeight);
 
   /// The dimension of this canvas.
+  @override
   PDimension get dimension => PDimension(width, height);
 
   /// The pixels ratio of the device of the [canvasNative].
@@ -834,21 +838,41 @@ class PStyle {
   int get hashCode => color.hashCode ^ size.hashCode;
 }
 
-/// A [PCanvas] dimension.
-class PDimension {
+abstract class WithDimension {
   /// The dimension width.
-  final num width;
+  num get width;
 
   /// The dimension height.
+  num get height;
+
+  /// The [PDimension] of this instance.
+  PDimension get dimension;
+
+  /// The aspect ration of this dimension ([width] / [height]).
+  double get aspectRation => isZeroDimension ? 0 : width / height;
+
+  /// The center [point] of this dimension.
+  Point get center => Point(width ~/ 2, height ~/ 2);
+
+  /// The area of this dimension.
+  num get area => isZeroDimension ? 0 : width * height;
+
+  /// Returns `true` if the area of this dimension is zero.
+  bool get isZeroDimension => width <= 0 || height <= 0;
+}
+
+/// A [PCanvas] dimension.
+class PDimension with WithDimension {
+  @override
+  final num width;
+
+  @override
   final num height;
 
   const PDimension(this.width, this.height);
 
-  /// The aspect ration of this dimension ([width] / [height]).
-  double get aspectRation => width / height;
-
-  /// The center [point] of this dimension.
-  Point get center => Point(width ~/ 2, height ~/ 2);
+  @override
+  PDimension get dimension => this;
 
   @override
   String toString() {
@@ -875,8 +899,10 @@ class PRectangle extends PDimension {
   PRectangle(this.x, this.y, super.width, super.height);
 
   @override
+  PRectangle get dimension => this;
 
   /// The center [Point] of this rectangle.
+  @override
   Point get center => Point(x + width ~/ 2, y + height ~/ 2);
 
   @override
@@ -906,6 +932,9 @@ class PTextMetric extends PDimension {
       : actualWidth = actualWidth ?? width,
         actualHeight = actualHeight ?? height,
         super();
+
+  @override
+  PTextMetric get dimension => this;
 
   /// Returns `true` if [actualWidth] == [width] AND [actualHeight] == [height].
   bool get inCompliance => actualWidth == width && actualHeight == height;

@@ -5,6 +5,55 @@ import 'package:test/test.dart';
 
 void main() {
   group('PCanvas', () {
+    test('PDimension', () {
+      {
+        var d = PDimension(10, 10);
+        expect(d.dimension, equals(PDimension(10, 10)));
+        expect(d.width, equals(10));
+        expect(d.height, equals(10));
+        expect(d.aspectRation, equals(1));
+        expect(d.area, equals(100));
+        expect(d.center, equals(Point(5, 5)));
+        expect(d.isZeroDimension, isFalse);
+      }
+      {
+        var d = PDimension(20, 10);
+        expect(d.dimension, equals(PDimension(20, 10)));
+        expect(d.width, equals(20));
+        expect(d.height, equals(10));
+        expect(d.aspectRation, equals(2));
+        expect(d.area, equals(200));
+        expect(d.center, equals(Point(10, 5)));
+        expect(d.isZeroDimension, isFalse);
+      }
+      {
+        var d = PDimension(10, 20);
+        expect(d.dimension, equals(PDimension(10, 20)));
+        expect(d.width, equals(10));
+        expect(d.height, equals(20));
+        expect(d.aspectRation, equals(0.5));
+        expect(d.area, equals(200));
+        expect(d.center, equals(Point(5, 10)));
+        expect(d.isZeroDimension, isFalse);
+      }
+      {
+        var d = PDimension(0, 10);
+        expect(d.dimension, equals(d));
+        expect(d.aspectRation, equals(0));
+        expect(d.area, equals(0));
+        expect(d.center, equals(Point(0, 5)));
+        expect(d.isZeroDimension, isTrue);
+      }
+      {
+        var d = PDimension(10, 0);
+        expect(d.dimension, equals(d));
+        expect(d.aspectRation, equals(0));
+        expect(d.area, equals(0));
+        expect(d.center, equals(Point(5, 0)));
+        expect(d.isZeroDimension, isTrue);
+      }
+    });
+
     void testPixelsFlood(PCanvasPixels pixels, PColor color) {
       var c = pixels.formatColor(color);
       expect(
