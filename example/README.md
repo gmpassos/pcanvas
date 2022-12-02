@@ -1,6 +1,6 @@
 # PCanvas - examples
 
-You can browser the examples at:
+You can browse the examples at:
 - https://github.com/gmpassos/pcanvas/tree/master/example
 
 ## Bitmap (in-memory) Example:
