@@ -1,0 +1,19 @@
+name: pcanvas_example_web
+description: Web example for package `pcanvas`.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '>=2.18.0 <3.0.0'
+
+dependencies:
+  pcanvas: ^1.0.0
+
+dev_dependencies:
+  build_runner: ^2.1.4
+  build_web_compilers: ^3.2.1
+  lints: ^2.0.0
+
+dependency_overrides:
+  pcanvas:
+    path: ../../
