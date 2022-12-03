@@ -445,7 +445,7 @@ class PCanvasHTML extends PCanvas {
 
   @override
   String toString() {
-    return 'PCanvasHTML[${width}x$height]';
+    return 'PCanvasHTML[${width}x$height]$info';
   }
 }
 

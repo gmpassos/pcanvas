@@ -191,6 +191,16 @@ abstract class PCanvas with WithDimension {
   /// Sets the pixel ration of this canvas and refreshes it.
   set pixelRatio(num pr);
 
+  /// [PCanvas] information.
+  Map<String, Object?> get info => <String, Object?>{
+        'pixelRatio': pixelRatio,
+        'devicePixelRatio': devicePixelRatio,
+        'width': width,
+        'height': height,
+        'elementWidth': elementWidth,
+        'elementHeight': elementHeight,
+      };
+
   /// Logs a debugging message.
   void log(Object? o);
 
@@ -231,7 +241,7 @@ abstract class PCanvas with WithDimension {
   }
 
   /// Refreshes the canvas asynchronously.
-  Future<bool> refresh() => Future.microtask(() => callPainter());
+  Future<bool> refresh() => Future.microtask(callPainter);
 
   /// The native canvas of this instance implementation.
   dynamic get canvasNative;

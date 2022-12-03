@@ -282,7 +282,7 @@ class PCanvasBitmap extends PCanvas {
 
   @override
   String toString() {
-    return 'PCanvasBitmap[${width}x$height]';
+    return 'PCanvasBitmap[${width}x$height]$info';
   }
 }
 
