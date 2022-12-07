@@ -1003,7 +1003,7 @@ class PColorRGB extends PColor {
   @override
   bool get hasAlpha => false;
 
-  int get a => 1;
+  int get a => 255;
 
   int maxDistance(PColorRGB other) {
     var rd = (r - other.r).abs();

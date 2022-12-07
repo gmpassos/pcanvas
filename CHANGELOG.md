@@ -1,3 +1,7 @@
+## 1.0.3
+
+- Fix `PColorRGB.a`.
+
 ## 1.0.2
 
 - `PCanvasEvent` now is abstract:
