@@ -53,6 +53,10 @@ class PCanvasHTML extends PCanvas {
     _canvas.onMouseUp.listen(_onMouseUp);
     _canvas.onClick.listen(_onClick);
 
+    window.onKeyDown.listen(_onKeyDown);
+    window.onKeyUp.listen(_onKeyUp);
+    window.onKeyPress.listen(_onKey);
+
     _canvasRelations[_canvas] = this;
     _resizeObserver.observe(_canvas);
 
@@ -135,6 +139,21 @@ class PCanvasHTML extends PCanvas {
     }
   }
 
+  Future<bool>? _requestedPaint;
+
+  @override
+  Future<bool> requestRepaint() {
+    var requestedPaint = _requestedPaint;
+    if (requestedPaint != null) return requestedPaint;
+
+    return _requestedPaint = refresh();
+  }
+
+  @override
+  void onPosPaint() {
+    _requestedPaint = null;
+  }
+
   void _onMouseDown(MouseEvent mEvent) =>
       painter.onClickDown(mEvent.toEvent('onMouseDown'));
 
@@ -143,6 +162,14 @@ class PCanvasHTML extends PCanvas {
 
   void _onClick(MouseEvent mEvent) =>
       painter.onClick(mEvent.toEvent('onClick'));
+
+  void _onKeyDown(KeyboardEvent kEvent) =>
+      painter.onKeyDown(kEvent.toEvent('onKeyDown'));
+
+  void _onKeyUp(KeyboardEvent kEvent) =>
+      painter.onKeyUp(kEvent.toEvent('onKeyUp'));
+
+  void _onKey(KeyboardEvent kEvent) => painter.onKey(kEvent.toEvent('onKey'));
 
   @override
   CanvasElement get canvasNative => _canvas;
@@ -262,6 +289,28 @@ class PCanvasHTML extends PCanvas {
 
     _setFillStyle(style);
     _ctx.fillRect(x, y, width, height);
+  }
+
+  @override
+  void fillTopDownGradient(
+      num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
+    var grd = _ctx.createLinearGradient(x, y, x, y + height);
+    grd.addColorStop(0, colorFrom.toString());
+    grd.addColorStop(1, colorTo.toString());
+
+    _setFillStyleGradient(grd);
+    _ctx.fillRect(x, y, x + width, y + height);
+  }
+
+  @override
+  void fillLeftRightGradient(
+      num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
+    var grd = _ctx.createLinearGradient(x, y, x + width, y);
+    grd.addColorStop(0, colorFrom.toString());
+    grd.addColorStop(1, colorTo.toString());
+
+    _setFillStyleGradient(grd);
+    _ctx.fillRect(x, y, x + width, y + height);
   }
 
   @override
@@ -399,6 +448,11 @@ class PCanvasHTML extends PCanvas {
     _lastFillStyle = style;
   }
 
+  void _setFillStyleGradient(CanvasGradient grd) {
+    _ctx.fillStyle = grd;
+    _lastFillStyle = PStyle();
+  }
+
   void _clearSetStates() {
     _lastFont = PFont('', 0);
     _lastFontPixelRatio = 0;
@@ -497,8 +551,15 @@ class _PCanvasImageElement extends PCanvasImage {
 }
 
 extension _MouseEventExtension on MouseEvent {
-  PCanvasEvent toEvent(String type) {
+  PCanvasClickEvent toEvent(String type) {
     var point = offset;
-    return PCanvasEvent(type, point.x, point.y);
+    return PCanvasClickEvent(type, point.x, point.y);
+  }
+}
+
+extension _KeyboardEventExtension on KeyboardEvent {
+  PCanvasKeyEvent toEvent(String type) {
+    return PCanvasKeyEvent(
+        type, charCode, code, key, ctrlKey, altKey, shiftKey, metaKey);
   }
 }

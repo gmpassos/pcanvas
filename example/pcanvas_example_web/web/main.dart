@@ -137,6 +137,10 @@ class MyCanvasPainter extends PCanvasPainter {
     pCanvas.strokePath(path, PStyle(color: PColor.colorRed, size: 3),
         closePath: true);
 
+    // Fill the right side of the canvas with a linear gradient:
+    pCanvas.fillRightLeftGradient(pCanvas.width ~/ 2, 0, pCanvas.width ~/ 2,
+        pCanvas.height, PColorRGB(0, 32, 94), PColor.colorBlack);
+
     return true;
   }
 
