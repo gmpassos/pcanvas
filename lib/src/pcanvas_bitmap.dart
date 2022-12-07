@@ -3,9 +3,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:image/image.dart' as img;
 
 import 'pcanvas_base.dart';
-import 'package:image/image.dart' as img;
 
 /// An in-memory [PCanvas] implementation.
 class PCanvasBitmap extends PCanvas {
@@ -49,6 +49,21 @@ class PCanvasBitmap extends PCanvas {
   @override
   void log(Object? o) {
     print(o);
+  }
+
+  Future<bool>? _requestedPaint;
+
+  @override
+  Future<bool> requestRepaint() {
+    var requestedPaint = _requestedPaint;
+    if (requestedPaint != null) return requestedPaint;
+
+    return _requestedPaint = refresh();
+  }
+
+  @override
+  void onPosPaint() {
+    _requestedPaint = null;
   }
 
   @override
@@ -174,6 +189,126 @@ class PCanvasBitmap extends PCanvas {
 
     img.fillRect(_bitmap, x.toInt(), y.toInt(), (x + width).toInt(),
         (y + height).toInt(), color.rgba32);
+  }
+
+  @override
+  void fillTopDownGradient(
+      num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
+    var cFrom = colorFrom.toPColorRGBA();
+    var cTo = colorTo.toPColorRGBA();
+
+    var r1 = cFrom.r;
+    var g1 = cFrom.g;
+    var b1 = cFrom.b;
+    var a1 = cFrom.alpha;
+
+    var r2 = cTo.r;
+    var g2 = cTo.g;
+    var b2 = cTo.b;
+    var a2 = cTo.alpha;
+
+    var rd = r2 - r1;
+    var gd = g2 - g1;
+    var bd = b2 - b1;
+    var ad = a2 - a1;
+
+    var w = width;
+    var h = height;
+
+    var steps = 256;
+
+    var s = h ~/ steps;
+    while (s == 0 && steps > 1) {
+      --steps;
+      s = h ~/ steps;
+    }
+
+    var end = (h ~/ s) - 1;
+
+    if (a1 == 1 && a1 == a2) {
+      for (var y = 0; y < h; y += s) {
+        var ratio = y / end;
+
+        var r = (r1 + rd * ratio).toInt();
+        var g = (g1 + gd * ratio).toInt();
+        var b = (b1 + bd * ratio).toInt();
+
+        var c = PColorRGB(r, g, b);
+        fillRect(0, y, w, s, PStyle(color: c));
+      }
+    } else {
+      for (var y = 0; y < h; y += s) {
+        var ratio = y / end;
+
+        var r = (r1 + rd * ratio).toInt();
+        var g = (g1 + gd * ratio).toInt();
+        var b = (b1 + bd * ratio).toInt();
+        var a = (a1 + ad * ratio);
+
+        var c = PColorRGBA(r, g, b, a);
+        fillRect(x, y, w, s, PStyle(color: c));
+      }
+    }
+  }
+
+  @override
+  void fillLeftRightGradient(
+      num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
+    var cFrom = colorFrom.toPColorRGBA();
+    var cTo = colorTo.toPColorRGBA();
+
+    var r1 = cFrom.r;
+    var g1 = cFrom.g;
+    var b1 = cFrom.b;
+    var a1 = cFrom.alpha;
+
+    var r2 = cTo.r;
+    var g2 = cTo.g;
+    var b2 = cTo.b;
+    var a2 = cTo.alpha;
+
+    var rd = r2 - r1;
+    var gd = g2 - g1;
+    var bd = b2 - b1;
+    var ad = a2 - a1;
+
+    var w = width;
+    var h = height;
+
+    var steps = 256;
+
+    var s = w ~/ steps;
+    while (s == 0 && steps > 1) {
+      --steps;
+      s = w ~/ steps;
+    }
+
+    var end = (w ~/ s) - 1;
+
+    if (a1 == 1 && a1 == a2) {
+      for (var x = 0; x < w; x += s) {
+        var ratio = x / end;
+
+        var r = (r1 + rd * ratio).toInt();
+        var g = (g1 + gd * ratio).toInt();
+        var b = (b1 + bd * ratio).toInt();
+
+        var c = PColorRGB(r, g, b);
+        fillRect(x, y, s, h, PStyle(color: c));
+      }
+    } else {
+      for (var x = 0; x < w; x += s) {
+        var ratio = x / end;
+
+        var r = (r1 + rd * ratio).toInt();
+        var g = (g1 + gd * ratio).toInt();
+        var b = (b1 + bd * ratio).toInt();
+        var a = (a1 + ad * ratio);
+
+        var c = PColorRGBA(r, g, b, a);
+        fillRect(x, y, s, h, PStyle(color: c));
+      }
+    }
   }
 
   @override

@@ -199,6 +199,72 @@ void main() {
 
     test('pixelsRect[blue]',
         () => testCanvasPixelsRect(MyPainterRect2(), PColor.colorBlue));
+
+    test('Gradient: top-down', () async {
+      var pCanvas = PCanvas(3, 100, MyPainterGradient1());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(3));
+      expect(pCanvas.height, equals(100));
+
+      var pixels = await pCanvas.pixels;
+
+      print(pixels);
+
+      expect(pixels.length, equals(3 * 100));
+
+      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 3));
+
+      expect(pixels.pixelColor(2, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 3));
+
+      expect(pixels.pixelColor(0, 99).maxDistance(PColorRGBA(255, 255, 255, 1)),
+          inInclusiveRange(0, 3));
+
+      expect(pixels.pixelColor(2, 99).maxDistance(PColorRGBA(255, 255, 255, 1)),
+          inInclusiveRange(0, 3));
+    });
+
+    test('Gradient: left-right', () async {
+      var pCanvas = PCanvas(512, 3, MyPainterGradient2());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(512));
+      expect(pCanvas.height, equals(3));
+
+      var pixels = await pCanvas.pixels;
+
+      print(pixels);
+
+      expect(pixels.length, equals(3 * 512));
+
+      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 3));
+
+      expect(pixels.pixelColor(0, 2).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 3));
+
+      expect(
+          pixels.pixelColor(511, 0).maxDistance(PColorRGBA(255, 255, 255, 1)),
+          inInclusiveRange(0, 3));
+
+      expect(
+          pixels.pixelColor(511, 2).maxDistance(PColorRGBA(255, 255, 255, 1)),
+          inInclusiveRange(0, 3));
+    });
   });
 }
 
@@ -235,6 +301,26 @@ class MyPainterRect2 extends PCanvasPainter {
     pCanvas.clear(style: PStyle(color: PColor.colorBlack));
 
     pCanvas.fillRect(0, 0, 1, 3, PStyle(color: PColor.colorBlue, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterGradient1 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.fillTopDownGradient(0, 0, pCanvas.width, pCanvas.height,
+        PColorRGB(0, 0, 0), PColorRGB(255, 255, 255));
+
+    return true;
+  }
+}
+
+class MyPainterGradient2 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.fillLeftRightGradient(0, 0, pCanvas.width, pCanvas.height,
+        PColorRGB(0, 0, 0), PColorRGB(255, 255, 255));
 
     return true;
   }

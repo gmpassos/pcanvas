@@ -1,39 +1,127 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:math' as math;
+
+import 'package:pcanvas/pcanvas.dart';
+
+import 'pcanvas_element.dart';
 
 import 'pcanvas_impl_bitmap.dart'
     if (dart.library.html) 'pcanvas_impl_html.dart';
 
 /// A [PCanvas] event.
-/// See [PCanvas.onClick].
-class PCanvasEvent {
+///
+/// See [PCanvasClickEvent].
+abstract class PCanvasEvent {
   /// The event type.
   final String type;
 
-  /// The event X coordinate.
-  final num x;
-
-  /// The event Y coordinate.
-  final num y;
-
-  const PCanvasEvent(this.type, this.x, this.y);
+  const PCanvasEvent(this.type);
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PCanvasEvent &&
           runtimeType == other.runtimeType &&
-          type == other.type &&
+          type == other.type;
+
+  @override
+  int get hashCode => type.hashCode;
+}
+
+/// A [PCanvas] click event.
+/// See [PCanvas.onClick].
+class PCanvasClickEvent extends PCanvasEvent {
+  /// The event X coordinate.
+  final num x;
+
+  /// The event Y coordinate.
+  final num y;
+
+  const PCanvasClickEvent(super.type, this.x, this.y) : super();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other &&
+          other is PCanvasClickEvent &&
+          runtimeType == other.runtimeType &&
           x == other.x &&
           y == other.y;
 
   @override
-  int get hashCode => type.hashCode ^ x.hashCode ^ y.hashCode;
+  int get hashCode => super.hashCode ^ x.hashCode ^ y.hashCode;
 
   @override
   String toString() {
-    return 'PCanvasEvent{type: $type, x: $x, y: $y}';
+    return 'PCanvasClickEvent{type: $type, x: $x, y: $y}';
+  }
+}
+
+/// A [PCanvas] key event.
+/// See [PCanvas.onKey].
+class PCanvasKeyEvent extends PCanvasEvent {
+  /// The Unicode value of the key:
+  final int charCode;
+
+  /// The code of the key (the name of the key).
+  final String? code;
+
+  /// The key value.
+  final String? key;
+
+  /// Whether the "CTRL" key was pressed.
+  final bool ctrlKey;
+
+  /// Whether the "ALT" key was pressed.
+  final bool altKey;
+
+  /// Whether the "SHIFT" key was pressed.
+  final bool shiftKey;
+
+  /// Whether the "META" key was pressed.
+  final bool metaKey;
+
+  const PCanvasKeyEvent(super.type, this.charCode, this.code, this.key,
+      this.ctrlKey, this.altKey, this.shiftKey, this.metaKey)
+      : super();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other &&
+          other is PCanvasKeyEvent &&
+          runtimeType == other.runtimeType &&
+          charCode == other.charCode &&
+          code == other.code &&
+          key == other.key &&
+          ctrlKey == other.ctrlKey &&
+          altKey == other.altKey &&
+          shiftKey == other.shiftKey &&
+          metaKey == other.metaKey;
+
+  @override
+  int get hashCode =>
+      super.hashCode ^
+      charCode.hashCode ^
+      code.hashCode ^
+      key.hashCode ^
+      ctrlKey.hashCode ^
+      altKey.hashCode ^
+      shiftKey.hashCode ^
+      metaKey.hashCode;
+
+  @override
+  String toString() {
+    var extra = [
+      if (shiftKey) 'SHIFT',
+      if (ctrlKey) 'CTRL',
+      if (altKey) 'ALT',
+      if (metaKey) 'META',
+    ];
+    return 'PCanvasKeyEvent{type: $type, key: <$key>, charCode: $charCode, code: <$code>}${extra.isNotEmpty ? '$extra' : ''}';
   }
 }
 
@@ -130,18 +218,38 @@ abstract class PCanvasPainter {
     return true;
   }
 
+  /// Paint the [elements].
+  FutureOr<bool> paintElements(
+      PCanvas pCanvas, List<PCanvasElement> elements, bool posPaint) {
+    for (var e in elements) {
+      e.paint(pCanvas);
+    }
+    return true;
+  }
+
   /// The paint operations.
   FutureOr<bool> paint(PCanvas pCanvas);
 
   /// Canvas `onClickDown` handler.
-  void onClickDown(PCanvasEvent event) {}
+  void onClickDown(PCanvasClickEvent event) {}
 
   /// Canvas `onClickUp` handler.
-  void onClickUp(PCanvasEvent event) {}
+  void onClickUp(PCanvasClickEvent event) {}
 
   /// Canvas `onClick` handler.
-  void onClick(PCanvasEvent event) {}
+  void onClick(PCanvasClickEvent event) {}
+
+  /// Canvas `onKeyDown` handler.
+  void onKeyDown(PCanvasKeyEvent event) {}
+
+  /// Canvas `onKeyUp` handler.
+  void onKeyUp(PCanvasKeyEvent event) {}
+
+  /// Canvas `onKey` handler.
+  void onKey(PCanvasKeyEvent event) {}
 }
+
+typedef PaintFuntion = FutureOr<bool> Function(PCanvas pCanvas);
 
 /// Portable Canvas.
 abstract class PCanvas with WithDimension {
@@ -168,6 +276,34 @@ abstract class PCanvas with WithDimension {
 
   factory PCanvas(int width, int height, PCanvasPainter painter) {
     return createPCanvasImpl(width, height, painter);
+  }
+
+  final List<PCanvasElement> _elements = <PCanvasElement>[];
+
+  List<PCanvasElement> get elements =>
+      UnmodifiableListView<PCanvasElement>(_elements);
+
+  bool get hasElements => _elements.isNotEmpty;
+
+  void clearElements() {
+    if (_elements.isNotEmpty) {
+      _elements.clear();
+      requestRepaint();
+    }
+  }
+
+  void addElement(PCanvasElement element) {
+    _elements.add(element);
+    _elements.sortByZIndex();
+    requestRepaint();
+  }
+
+  bool removeElement(PCanvasElement element) {
+    var rm = _elements.remove(element);
+    if (rm) {
+      requestRepaint();
+    }
+    return rm;
   }
 
   /// Waits the loading of the canvas and also the [painter.loadResources].
@@ -217,28 +353,85 @@ abstract class PCanvas with WithDimension {
     checkDimension();
 
     try {
+      final painter = this.painter;
+
+      onPrePaint();
+
       painter.clear(this);
 
-      FutureOr<bool> ret;
-      if (painter.isLoadingResources) {
-        ret = painter.paintLoading(this);
-      } else {
-        ret = painter.paint(this);
-      }
+      final ret = painter.isLoadingResources
+          ? _callPainterLoading()
+          : _callPainterImpl();
 
       if (ret is Future<bool>) {
         return ret.whenComplete(() {
           _painting = false;
+          onPosPaint();
         });
       } else {
         _painting = false;
+        onPosPaint();
         return ret;
       }
     } catch (e) {
       _painting = false;
+      onPosPaint();
       rethrow;
     }
   }
+
+  FutureOr<bool> _callPainterLoading() {
+    return painter.paintLoading(this);
+  }
+
+  FutureOr<bool> _callPainterImpl() {
+    var hasElements = _elements.isNotEmpty;
+
+    List<PCanvasElement>? elementsPrev;
+    List<PCanvasElement>? elementsPos;
+
+    if (hasElements) {
+      elementsPrev = _elements.where((e) {
+        var zIndex = e.zIndex;
+        return zIndex != null && zIndex < 0;
+      }).toList();
+
+      elementsPos = _elements.where((e) {
+        var zIndex = e.zIndex;
+        return zIndex == null || zIndex >= 0;
+      }).toList();
+    }
+
+    final painter = this.painter;
+
+    FutureOr<bool> ret = true;
+
+    if (elementsPrev != null) {
+      ret = painter.paintElements(this, elementsPrev, false);
+    }
+
+    if (ret is Future<bool>) {
+      ret = ret.then((_) => painter.paint(this));
+    } else {
+      ret = painter.paint(this);
+    }
+
+    if (elementsPos != null) {
+      if (ret is Future<bool>) {
+        ret = ret.then((_) => painter.paintElements(this, elementsPos!, true));
+      } else {
+        ret = painter.paintElements(this, elementsPos, true);
+      }
+    }
+
+    return ret;
+  }
+
+  void onPrePaint() {}
+
+  void onPosPaint() {}
+
+  Future<bool> requestRepaint();
 
   /// Refreshes the canvas asynchronously.
   Future<bool> refresh() => Future.microtask(callPainter);
@@ -323,6 +516,28 @@ abstract class PCanvas with WithDimension {
 
   /// Fill a rectangle ([x],[y] , [width] x [height]).
   void fillRect(num x, num y, num width, num height, PStyle style);
+
+  /// Fill a rectangle ([x],[y] , [width] x [height]) with a top down linear gradient.
+  /// See [fillBottomUpGradient].
+  void fillTopDownGradient(
+      num x, num y, num width, num height, PColor colorFrom, PColor colorTo);
+
+  /// Fill a rectangle ([x],[y] , [width] x [height]) with a bottom up linear gradient.
+  /// See [fillTopDownGradient].
+  void fillBottomUpGradient(num x, num y, num width, num height,
+          PColor colorFrom, PColor colorTo) =>
+      fillTopDownGradient(x, y, width, height, colorTo, colorFrom);
+
+  /// Fill a rectangle ([x],[y] , [width] x [height]) with a left right linear gradient.
+  /// See [fillRightLeftGradient].
+  void fillLeftRightGradient(
+      num x, num y, num width, num height, PColor colorFrom, PColor colorTo);
+
+  /// Fill a rectangle ([x],[y] , [width] x [height]) with a right left linear gradient.
+  /// See [fillLeftRightGradient].
+  void fillRightLeftGradient(num x, num y, num width, num height,
+          PColor colorFrom, PColor colorTo) =>
+      fillLeftRightGradient(x, y, width, height, colorTo, colorFrom);
 
   /// Measure the [text] dimension.
   PTextMetric measureText(String text, PFont font);
@@ -437,11 +652,17 @@ abstract class PCanvasPixels {
   /// Formats [color] to this instance [format].
   int formatColor(PColor color);
 
+  /// Parse [pixel] to [PColor];
+  PColorRGB parseColor(int pixel);
+
   /// Index of a pixel ([x],[y]) at [pixels].
   int pixelIndex(int x, int y) => (width * y) + x;
 
   /// Returns a pixel at ([x],[y]) in the format 4-byte Uint32 integer in #AABBGGRR channel order.
   int pixel(int x, int y) => pixels[pixelIndex(x, y)];
+
+  /// Returns a pixel at ([x],[y]) as [PColor].
+  PColorRGB pixelColor(int x, int y) => parseColor(pixel(x, y));
 
   /// Returns the Red channel of [pixel] at ([x],[y]).
   int pixelR(int x, int y);
@@ -476,6 +697,9 @@ class PCanvasPixelsARGB extends PCanvasPixels {
 
   @override
   int formatColor(PColor color) => color.argb;
+
+  @override
+  PColorRGB parseColor(int pixel) => PColorRGBA.fromARGB(pixel);
 
   /// Returns the Alpha channel of [pixel] at ([x],[y]).
   @override
@@ -533,6 +757,9 @@ class PCanvasPixelsABGR extends PCanvasPixels {
   @override
   int formatColor(PColor color) => color.abgr;
 
+  @override
+  PColorRGB parseColor(int pixel) => PColorRGBA.fromABGR(pixel);
+
   /// Returns the Alpha channel of [pixel] at ([x],[y]).
   @override
   int pixelA(int x, int y) => ((pixel(x, y) >> 24) & 0xff);
@@ -588,6 +815,9 @@ class PCanvasPixelsRGBA extends PCanvasPixels {
 
   @override
   int formatColor(PColor color) => color.rgba;
+
+  @override
+  PColorRGB parseColor(int pixel) => PColorRGBA.fromRGBA(pixel);
 
   /// Returns the Red channel of [pixel] at ([x],[y]).
   @override
@@ -702,6 +932,12 @@ abstract class PColor {
   /// Returns `true` if this color has alpha.
   bool get hasAlpha;
 
+  /// Converts this intances to a [PColorRGB].
+  PColorRGB toPColorRGB();
+
+  /// Converts this intances to a [PColorRGBA].
+  PColorRGBA toPColorRGBA();
+
   PColorRGB copyWith({int? r, int? g, int? b, double? alpha});
 
   /// Converts to the `RGB` format.
@@ -743,10 +979,46 @@ class PColorRGB extends PColor {
         g = g.clamp(0, 255),
         b = b.clamp(0, 255);
 
+  PColorRGB.fromRGB(int p)
+      : this(
+          (p >> 16) & 0xff,
+          (p >> 8) & 0xff,
+          (p) & 0xff,
+        );
+
+  PColorRGB.fromRGBA(int p)
+      : this(
+          (p >> 24) & 0xff,
+          (p >> 16) & 0xff,
+          (p >> 8) & 0xff,
+        );
+
+  PColorRGB.fromBGR(int p)
+      : this(
+          (p) & 0xff,
+          (p >> 8) & 0xff,
+          (p >> 16) & 0xff,
+        );
+
   @override
   bool get hasAlpha => false;
 
-  String? _rgb;
+  int get a => 1;
+
+  int maxDistance(PColorRGB other) {
+    var rd = (r - other.r).abs();
+    var gd = (g - other.g).abs();
+    var bd = (b - other.b).abs();
+    var ad = (a - other.a).abs();
+
+    return math.max(rd, math.max(gd, math.max(bd, ad)));
+  }
+
+  @override
+  PColorRGB toPColorRGB() => this;
+
+  @override
+  PColorRGBA toPColorRGBA() => PColorRGBA(r, g, b, 1);
 
   @override
   PColorRGB copyWith({int? r, int? g, int? b, double? alpha}) {
@@ -756,6 +1028,8 @@ class PColorRGB extends PColor {
       return PColorRGB(r ?? this.r, g ?? this.g, b ?? this.b);
     }
   }
+
+  String? _rgb;
 
   @override
   String toRGB() => _rgb ??= 'rgb($r,$g,$b)';
@@ -792,18 +1066,49 @@ class PColorRGBA extends PColorRGB {
   PColorRGBA(super.r, super.g, super.b, double a)
       : alpha = ((a.clamp(0, 1) * 10000).toInt() / 10000);
 
+  PColorRGBA.fromARGB(int p)
+      : this(
+          (p >> 16) & 0xff,
+          (p >> 8) & 0xff,
+          (p) & 0xff,
+          ((p >> 24) & 0xff) / 255,
+        );
+
+  PColorRGBA.fromABGR(int p)
+      : this(
+          (p) & 0xff,
+          (p >> 8) & 0xff,
+          (p >> 16) & 0xff,
+          ((p >> 24) & 0xff) / 255,
+        );
+
+  PColorRGBA.fromRGBA(int p)
+      : this(
+          (p >> 24) & 0xff,
+          (p >> 16) & 0xff,
+          (p >> 8) & 0xff,
+          ((p) & 0xff) / 255,
+        );
+
   @override
   bool get hasAlpha => alpha != 1.0;
 
   int? _a;
 
+  @override
   int get a => _a ??= (alpha * 255).toInt();
 
-  String? _rgba;
+  @override
+  PColorRGB toPColorRGB() => PColorRGB(r, g, b);
+
+  @override
+  PColorRGBA toPColorRGBA() => this;
 
   @override
   PColorRGB copyWith({int? r, int? g, int? b, double? alpha}) =>
       PColorRGBA(r ?? this.r, g ?? this.g, b ?? this.b, alpha ?? this.alpha);
+
+  String? _rgba;
 
   @override
   String toRGBA() => _rgba ??= 'rgba($r,$g,$b,$alpha)';
@@ -907,6 +1212,12 @@ class PRectangle extends PDimension {
   final num y;
 
   PRectangle(this.x, this.y, super.width, super.height);
+
+  PRectangle.fromDimension(num x, num y, PDimension dimension)
+      : this(x, y, dimension.width, dimension.height);
+
+  PRectangle copyWith({num? x, num? y, num? width, num? height}) => PRectangle(
+      x ?? this.x, y ?? this.y, width ?? this.width, height ?? this.height);
 
   @override
   PRectangle get dimension => this;
