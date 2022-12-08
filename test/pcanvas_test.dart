@@ -286,16 +286,16 @@ void main() {
       expect(pixels.length, equals(30 * 15));
 
       expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 30));
+          inInclusiveRange(0, 40));
 
       expect(pixels.pixelColor(2, 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 30));
+          inInclusiveRange(0, 40));
 
       expect(pixels.pixelColor(2, 6).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 30));
+          inInclusiveRange(0, 40));
 
       expect(pixels.pixelColor(2, 8).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 30));
+          inInclusiveRange(0, 40));
     });
   });
 }
