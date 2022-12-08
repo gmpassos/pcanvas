@@ -534,7 +534,7 @@ class _PCanvasImageMemoryAsync extends PCanvasImageMemory {
 }
 
 extension _PFontExtension on PFont {
-  img.BitmapFont toBitmapFont() {
+  img.BitmapFont toBitmapFontFamily() {
     if (size >= 36) {
       return img.arial_48;
     } else if (size >= 19) {
@@ -542,5 +542,13 @@ extension _PFontExtension on PFont {
     } else {
       return img.arial_14;
     }
+  }
+
+  img.BitmapFont toBitmapFont() {
+    var f = toBitmapFontFamily();
+    if (bold) f.bold = true;
+    if (italic) f.italic = true;
+    f.antialias = true;
+    return f;
   }
 }

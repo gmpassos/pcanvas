@@ -1,3 +1,9 @@
+## 1.0.4
+
+- `PCanvasBitmap`:
+  - Support for `bold` and `italic`.
+  - Enable text anti-aliasing.
+
 ## 1.0.3
 
 - Fix `PColorRGB.a`.
