@@ -292,6 +292,40 @@ class PCanvasHTML extends PCanvas {
   }
 
   @override
+  void strokeCircle(num x, num y, num radius, PStyle style,
+      {num startAngle = 0, num endAngle = 360}) {
+    x = canvasX(x);
+    y = canvasY(y);
+    radius = canvasX(radius);
+
+    startAngle = angleToRadians(startAngle);
+    endAngle = angleToRadians(endAngle);
+
+    _setFillStyle(style);
+
+    _ctx.beginPath();
+    _ctx.arc(x, y, radius, startAngle, endAngle);
+    _ctx.stroke();
+  }
+
+  @override
+  void fillCircle(num x, num y, num radius, PStyle style,
+      {num startAngle = 0, num endAngle = 360}) {
+    x = canvasX(x);
+    y = canvasY(y);
+    radius = canvasX(radius);
+
+    startAngle = angleToRadians(startAngle);
+    endAngle = angleToRadians(endAngle);
+
+    _setFillStyle(style);
+
+    _ctx.beginPath();
+    _ctx.arc(x, y, radius, startAngle, endAngle);
+    _ctx.fill();
+  }
+
+  @override
   void fillTopDownGradient(
       num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
     var grd = _ctx.createLinearGradient(x, y, x, y + height);

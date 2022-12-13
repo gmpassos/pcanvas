@@ -1,6 +1,6 @@
 name: pcanvas
 description: A portable canvas that can work in many platforms (Flutter, Web, Desktop, in-memory Image).
-version: 1.0.3
+version: 1.0.5
 homepage: https://github.com/gmpassos/pcanvas
 
 environment:

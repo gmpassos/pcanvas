@@ -265,6 +265,97 @@ void main() {
           pixels.pixelColor(511, 2).maxDistance(PColorRGBA(255, 255, 255, 1)),
           inInclusiveRange(0, 3));
     });
+
+    test('Text', () async {
+      var pCanvas = PCanvas(30, 15, MyPainterText1());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(30));
+      expect(pCanvas.height, equals(15));
+
+      var pixels = await pCanvas.pixels;
+
+      print(pixels);
+
+      expect(pixels.length, equals(30 * 15));
+
+      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(255, 255, 255, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(2, 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(2, 6).maxDistance(PColorRGBA(255, 255, 255, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(2, 8).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+    });
+
+    test('Circel1', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterCircle1());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(10));
+      expect(pCanvas.height, equals(10));
+
+      var pixels = await pCanvas.pixels;
+
+      print(pixels);
+
+      expect(pixels.length, equals(10 * 10));
+
+      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(9, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(0, 9).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(9, 9).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 - 4, 5).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 + 4, 5).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 - 4).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 + 4).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 - 2, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 + 2, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 - 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 + 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+    });
   });
 }
 
@@ -306,6 +397,28 @@ class MyPainterRect2 extends PCanvasPainter {
   }
 }
 
+class MyPainterCircle1 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.fillCircle(5, 5, 3, PStyle(color: PColor.colorRed, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterCircle2 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.strokeCircle(5, 5, 2, PStyle(color: PColor.colorRed, size: 1));
+
+    return true;
+  }
+}
+
 class MyPainterGradient1 extends PCanvasPainter {
   @override
   FutureOr<bool> paint(PCanvas pCanvas) {
@@ -321,6 +434,21 @@ class MyPainterGradient2 extends PCanvasPainter {
   FutureOr<bool> paint(PCanvas pCanvas) {
     pCanvas.fillLeftRightGradient(0, 0, pCanvas.width, pCanvas.height,
         PColorRGB(0, 0, 0), PColorRGB(255, 255, 255));
+
+    return true;
+  }
+}
+
+class MyPainterText1 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorWhite));
+
+    var font = PFont('Arial', 14);
+    var text = 'X';
+    var style = PStyle(color: PColor.colorRed);
+
+    pCanvas.drawText(text, 0, 0, font, style);
 
     return true;
   }
