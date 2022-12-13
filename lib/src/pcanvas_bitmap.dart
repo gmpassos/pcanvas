@@ -192,6 +192,42 @@ class PCanvasBitmap extends PCanvas {
   }
 
   @override
+  void strokeCircle(num x, num y, num radius, PStyle style,
+      {num startAngle = 0, num endAngle = 360}) {
+    x = canvasX(x);
+    y = canvasY(y);
+    radius = canvasX(radius);
+    var color = style.color ?? PColor.colorGrey;
+
+    if ((startAngle == 0 && endAngle == 360) ||
+        (startAngle == 360 && endAngle == 0)) {
+      img.drawCircle(
+          _bitmap, x.toInt(), y.toInt(), radius.toInt(), color.rgba32);
+    } else {
+      throw UnsupportedError(
+          "Only `startAngle = 0` and `endAngle = 360` are suported.");
+    }
+  }
+
+  @override
+  void fillCircle(num x, num y, num radius, PStyle style,
+      {num startAngle = 0, num endAngle = 360}) {
+    x = canvasX(x);
+    y = canvasY(y);
+    radius = canvasX(radius);
+    var color = style.color ?? PColor.colorGrey;
+
+    if ((startAngle == 0 && endAngle == 360) ||
+        (startAngle == 360 && endAngle == 0)) {
+      img.fillCircle(
+          _bitmap, x.toInt(), y.toInt(), radius.toInt(), color.rgba32);
+    } else {
+      throw UnsupportedError(
+          "Only `startAngle = 0` and `endAngle = 360` are suported.");
+    }
+  }
+
+  @override
   void fillTopDownGradient(
       num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
     var cFrom = colorFrom.toPColorRGBA();

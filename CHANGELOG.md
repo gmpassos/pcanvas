@@ -1,3 +1,7 @@
+## 1.0.5
+
+- Add support to stroke/fill circles.
+
 ## 1.0.4
 
 - `PCanvasBitmap`:

@@ -86,12 +86,18 @@ class MyCanvasPainter extends PCanvasPainter {
     // Clear the canvas with `colorGrey`:
     pCanvas.clear(style: PStyle(color: PColor.colorGrey));
 
+    var canvasWidth = pCanvas.width;
+    var canvasHeight = pCanvas.height;
+
+    var canvasWidthHalf = canvasWidth ~/ 2;
+    var canvasHeightHalf = canvasHeight ~/ 2;
+
     // Draw an image fitting the target area:
-    pCanvas.drawImageFitted(img1, 0, 0, pCanvas.width ~/ 2, pCanvas.height);
+    pCanvas.drawImageFitted(img1, 0, 0, canvasWidthHalf, canvasHeight);
 
     // Draw an image centered at `area` with scale `0.3`:
     pCanvas.centered(
-      area: PRectangle(0, 0, pCanvas.width ~/ 2, pCanvas.height * 0.50),
+      area: PRectangle(0, 0, canvasWidthHalf, canvasHeight * 0.50),
       dimension: img2.dimension,
       scale: 0.3,
       (pc, p, sz) => pc.drawImageScaled(img2, p.x, p.y, sz.width, sz.height),
@@ -121,7 +127,7 @@ class MyCanvasPainter extends PCanvasPainter {
 
     // Draw a text and a shadow at the center of `area`:
     pCanvas.centered(
-      area: PRectangle(0, 0, pCanvas.width ~/ 2, pCanvas.height * 0.30),
+      area: PRectangle(0, 0, canvasWidthHalf, canvasHeight * 0.30),
       dimension: pCanvas.measureText(textHello, fontHello),
       (pc, p, sz) {
         pc.drawText(textHello, p.x + 4, p.y + 4, fontHello,
@@ -138,8 +144,12 @@ class MyCanvasPainter extends PCanvasPainter {
         closePath: true);
 
     // Fill the right side of the canvas with a linear gradient:
-    pCanvas.fillRightLeftGradient(pCanvas.width ~/ 2, 0, pCanvas.width ~/ 2,
-        pCanvas.height, PColorRGB(0, 32, 94), PColor.colorBlack);
+    pCanvas.fillRightLeftGradient(canvasWidthHalf, 0, canvasWidthHalf,
+        canvasHeight, PColorRGB(0, 32, 94), PColor.colorBlack);
+
+    // Fill a circle:
+    pCanvas.fillCircle(canvasWidthHalf + (canvasWidthHalf ~/ 2),
+        canvasHeightHalf, 20, PStyle(color: PColor.colorGreen));
 
     return true;
   }

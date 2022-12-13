@@ -517,6 +517,17 @@ abstract class PCanvas with WithDimension {
   /// Fill a rectangle ([x],[y] , [width] x [height]).
   void fillRect(num x, num y, num width, num height, PStyle style);
 
+  /// Converts [angle] in degrees to arcs.
+  double angleToRadians(num angle) => (math.pi / 180) * angle;
+
+  /// Stroke a circle at ([x],[y]) with [radius].
+  void strokeCircle(num x, num y, num radius, PStyle style,
+      {num startAngle = 0, num endAngle = 360});
+
+  /// Fill a circle at ([x],[y]) with [radius].
+  void fillCircle(num x, num y, num radius, PStyle style,
+      {num startAngle = 0, num endAngle = 360});
+
   /// Fill a rectangle ([x],[y] , [width] x [height]) with a top down linear gradient.
   /// See [fillBottomUpGradient].
   void fillTopDownGradient(

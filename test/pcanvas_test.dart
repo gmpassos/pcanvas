@@ -297,6 +297,65 @@ void main() {
       expect(pixels.pixelColor(2, 8).maxDistance(PColorRGBA(255, 0, 0, 1)),
           inInclusiveRange(0, 40));
     });
+
+    test('Circel1', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterCircle1());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(10));
+      expect(pCanvas.height, equals(10));
+
+      var pixels = await pCanvas.pixels;
+
+      print(pixels);
+
+      expect(pixels.length, equals(10 * 10));
+
+      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(9, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(0, 9).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(9, 9).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 - 4, 5).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 + 4, 5).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 - 4).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 + 4).maxDistance(PColorRGBA(0, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 - 2, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5 + 2, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 - 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+
+      expect(pixels.pixelColor(5, 5 + 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
+          inInclusiveRange(0, 40));
+    });
   });
 }
 
@@ -333,6 +392,28 @@ class MyPainterRect2 extends PCanvasPainter {
     pCanvas.clear(style: PStyle(color: PColor.colorBlack));
 
     pCanvas.fillRect(0, 0, 1, 3, PStyle(color: PColor.colorBlue, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterCircle1 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.fillCircle(5, 5, 3, PStyle(color: PColor.colorRed, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterCircle2 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.strokeCircle(5, 5, 2, PStyle(color: PColor.colorRed, size: 1));
 
     return true;
   }
