@@ -1,3 +1,27 @@
+## 1.0.6
+
+- `PCanvas`:
+  - Constructor: added parameter `initialPixels`. 
+  - Added method `setPixels`.
+  - Added support for `clip` and `subClip`.
+  - Added `transform`: new `PcanvasTransform` class.
+  - Added `saveState`, `restoreState` and `callWithGuardedState`.
+  - `elements` now is unmmodifiable.
+- `PCanvasPixels`:
+  - New constructor `PCanvasPixels.fromBytes`.
+  - Added `setPixel`, `setPixelFrom`, `setPixelsLineFrom`, `setPixelsColumnFrom` and `setPixelsRectFrom`.
+  - Added `putPixels`, `copyRectangle` and `copyRect`.
+  - Added `toPCanvas`, `toPNG` and `toDataUrl`.
+- New `PCanvasElementContainer`:
+  - New `PCanvasPanel2D` and `PRectangleElement`.
+- `PRectangle`:
+  - Added `intersectsRectangle`, `intersects` and `intersection`.
+  - Added `containsRectangle`, `contains`, `containsPoint` and `containsXY`.
+  - Added `transform`.
+- image: ^4.0.7
+- test: ^1.22.1
+- collection: ^1.16.0
+
 ## 1.0.5
 
 - Add support to stroke/fill circles.

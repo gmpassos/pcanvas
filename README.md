@@ -2,7 +2,7 @@
 
 [![pub package](https://img.shields.io/pub/v/pcanvas.svg?logo=dart&logoColor=00b9fc)](https://pub.dev/packages/pcanvas)
 [![Null Safety](https://img.shields.io/badge/null-safety-brightgreen)](https://dart.dev/null-safety)
-[![CI](https://img.shields.io/github/workflow/status/gmpassos/pcanvas/Dart%20CI/master?logo=github-actions&logoColor=white)](https://github.com/gmpassos/pcanvas/actions)
+[![Dart CI](https://github.com/gmpassos/pcanvas/actions/workflows/dart.yml/badge.svg?branch=master)](https://github.com/gmpassos/pcanvas/actions/workflows/dart.yml)
 [![GitHub Tag](https://img.shields.io/github/v/tag/gmpassos/pcanvas?logo=git&logoColor=white)](https://github.com/gmpassos/pcanvas/releases)
 [![New Commits](https://img.shields.io/github/commits-since/gmpassos/pcanvas/latest?logo=git&logoColor=white)](https://github.com/gmpassos/pcanvas/network)
 [![Last Commits](https://img.shields.io/github/last-commit/gmpassos/pcanvas?logo=git&logoColor=white)](https://github.com/gmpassos/pcanvas/commits/master)
