@@ -679,11 +679,8 @@ class PCanvasHTML extends PCanvas {
 
     var imageData = _ctx.getImageData(0, 0, w, h);
 
-    var data = imageData.data.buffer.asUint32List(
-        imageData.data.offsetInBytes, (imageData.width * imageData.height));
-
-    return PCanvasPixelsABGR.fromPixels(
-        imageData.width, imageData.height, data);
+    return PCanvasPixelsABGR.fromBytes(
+        imageData.width, imageData.height, imageData.data);
   }
 
   @override

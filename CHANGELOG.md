@@ -8,6 +8,7 @@
   - Added `saveState`, `restoreState` and `callWithGuardedState`.
   - `elements` now is unmmodifiable.
 - `PCanvasPixels`:
+  - New constructor `PCanvasPixels.fromBytes`.
   - Added `setPixel`, `setPixelFrom`, `setPixelsLineFrom`, `setPixelsColumnFrom` and `setPixelsRectFrom`.
   - Added `putPixels`, `copyRectangle` and `copyRect`.
   - Added `toPCanvas`, `toPNG` and `toDataUrl`.

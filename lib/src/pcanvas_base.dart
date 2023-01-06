@@ -886,6 +886,28 @@ abstract class PCanvasPixels {
   PCanvasPixels.blank(this.width, this.height)
       : pixels = Uint32List(width * height);
 
+  /// Construct a [PCanvasPixels] from [bytes].
+  /// - If [bytes] is a [TypedData] it will be converted to an [Uint32List]
+  ///   through its internal [ByteBuffer].
+  /// - If [bytes] is not a [TypedData] it will be converted to a [Uint8ClampedList.fromList]
+  ///   and after that to an [Uint32List].
+  /// - Note that in most systems the [Endian.host] is 'little-endian'.
+  /// - Modern CPU architectures are `little-endian`, like `x86` and `ARMv8`.
+  PCanvasPixels.fromBytes(int width, int height, List<int> bytes)
+      : this.fromPixels(width, height, _bytesToUint32List(bytes));
+
+  static Uint32List _bytesToUint32List(List<int> bytes) {
+    if (bytes is TypedData) {
+      var td = bytes as TypedData;
+      return td.buffer.asUint32List(td.offsetInBytes, td.lengthInBytes ~/ 4);
+    } else {
+      var bs = Uint8ClampedList.fromList(bytes);
+      return bs.buffer.asUint32List(bs.offsetInBytes, bs.lengthInBytes ~/ 4);
+    }
+  }
+
+  /// Construct a [PCanvasPixels] from [pixels].
+  /// - [pixels] is expected to be an [Uint32List] in the same [format] of this class implementation.
   PCanvasPixels.fromPixels(this.width, this.height, this.pixels);
 
   /// Creates a blank [PCanvasPixels] instance with the same [format] of this one.
@@ -1031,6 +1053,9 @@ abstract class PCanvasPixels {
 class PCanvasPixelsARGB extends PCanvasPixels {
   PCanvasPixelsARGB.blank(super.width, super.height) : super.blank();
 
+  PCanvasPixelsARGB.fromBytes(super.width, super.height, super.bytes)
+      : super.fromBytes();
+
   PCanvasPixelsARGB.fromPixels(super.width, super.height, super.pixels)
       : super.fromPixels();
 
@@ -1100,6 +1125,9 @@ class PCanvasPixelsARGB extends PCanvasPixels {
 class PCanvasPixelsABGR extends PCanvasPixels {
   PCanvasPixelsABGR.blank(super.width, super.height) : super.blank();
 
+  PCanvasPixelsABGR.fromBytes(super.width, super.height, super.bytes)
+      : super.fromBytes();
+
   PCanvasPixelsABGR.fromPixels(super.width, super.height, super.pixels)
       : super.fromPixels();
 
@@ -1168,6 +1196,9 @@ class PCanvasPixelsABGR extends PCanvasPixels {
 /// [PCanvasPixels] in `RGBA` format.
 class PCanvasPixelsRGBA extends PCanvasPixels {
   PCanvasPixelsRGBA.blank(super.width, super.height) : super.blank();
+
+  PCanvasPixelsRGBA.fromBytes(super.width, super.height, super.bytes)
+      : super.fromBytes();
 
   PCanvasPixelsRGBA.fromPixels(super.width, super.height, super.pixels)
       : super.fromPixels();

@@ -48,8 +48,6 @@ class PCanvasBitmap extends PCanvas {
 
     if (w <= 0 || h <= 0) return;
 
-    pixels = pixels.toPCanvasPixelsABGR();
-
     for (var y1 = 0; y1 < h; ++y1) {
       for (var x1 = 0; x1 < w; ++x1) {
         var p = pixels.getImageColor(x, y);
@@ -707,7 +705,7 @@ class PCanvasBitmap extends PCanvas {
     if (paintRectClipped.isZeroDimension) return null;
 
     var pixels =
-        PCanvasPixelsABGR.fromPixels(width, height, _bitmap.dataAsUint32List);
+        PCanvasPixelsRGBA.fromBytes(width, height, _bitmap.dataAsUint8List);
 
     var cp1 = pixels.copyRectangle(paintRect)!;
 
@@ -753,7 +751,7 @@ class PCanvasBitmap extends PCanvas {
 
   @override
   PCanvasPixels get pixels =>
-      PCanvasPixelsABGR.fromPixels(width, height, _bitmap.dataAsUint32List);
+      PCanvasPixelsABGR.fromBytes(width, height, _bitmap.dataAsUint8List);
 
   @override
   FutureOr<Uint8List> toPNG() => img.encodePng(_bitmap);
@@ -958,11 +956,10 @@ extension _PCanvasPixelsExtension on PCanvasPixels {
 }
 
 extension _ImageExtension on img.Image {
-  Uint32List get dataAsUint32List {
+  Uint8List get dataAsUint8List {
     var imageData = data as img.ImageDataUint8;
     var dataUint8 = imageData.data;
-    return dataUint8.buffer
-        .asUint32List(dataUint8.offsetInBytes, dataUint8.length ~/ 4);
+    return dataUint8;
   }
 }
 

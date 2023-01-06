@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:pcanvas/pcanvas.dart';
 import 'package:test/test.dart';
@@ -51,6 +52,39 @@ void main() {
         expect(d.area, equals(0));
         expect(d.center, equals(Point(5, 0)));
         expect(d.isZeroDimension, isTrue);
+      }
+    });
+
+    test('PCanvas.pixels', () async {
+      var pCanvas = PCanvas(3, 3, MyPainterChannels());
+
+      print(pCanvas);
+
+      print(
+          'Endian.host: ${Endian.host == Endian.big ? 'big' : 'little'}-endian');
+
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(3));
+      expect(pCanvas.height, equals(3));
+
+      print(pCanvas.toDataUrl());
+
+      var pixels = await pCanvas.pixels;
+
+      print(pixels);
+
+      expect(pixels.length, equals(3 * 3));
+
+      {
+        var c = pixels.pixelColor(0, 0);
+        expect(c.r, equals(1));
+        expect(c.g, equals(2));
+        expect(c.b, equals(3));
+        expect(c.a, equals(255));
       }
     });
 
@@ -640,6 +674,14 @@ Future<void> _checkDataUrl(PCanvas pCanvas, String title) async {
   var dataUrl = await pCanvas.toDataUrl();
   print(dataUrl);
   expect(dataUrl, startsWith('data:image/png;base64,iV'));
+}
+
+class MyPainterChannels extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColorRGBA(01, 02, 03, 1)));
+    return true;
+  }
 }
 
 class MyPainterFlood1 extends PCanvasPainter {
