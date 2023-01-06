@@ -1,0 +1,7 @@
+
+tags:
+  # Slow tests.
+  slow:
+    timeout: 180s
+
+platforms: [vm, chrome]

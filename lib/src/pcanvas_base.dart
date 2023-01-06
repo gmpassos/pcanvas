@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
-import 'package:pcanvas/pcanvas.dart';
+import 'package:collection/collection.dart';
+import 'package:pcanvas/pcanvas_bitmap.dart';
 
 import 'pcanvas_element.dart';
-
 import 'pcanvas_impl_bitmap.dart'
     if (dart.library.html) 'pcanvas_impl_html.dart';
 
@@ -249,10 +248,23 @@ abstract class PCanvasPainter {
   void onKey(PCanvasKeyEvent event) {}
 }
 
+/// A dummy [PCanvasPainter] implementation that won't perform any operation.
+class PCanvasPainterDummy extends PCanvasPainter {
+  @override
+  void clear(PCanvas pCanvas) {}
+
+  @override
+  FutureOr<bool> paintLoading(PCanvas pCanvas) => true;
+
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) => true;
+}
+
 typedef PaintFuntion = FutureOr<bool> Function(PCanvas pCanvas);
 
 /// Portable Canvas.
-abstract class PCanvas with WithDimension {
+abstract class PCanvas
+    with PCanvasElementContainer<PCanvasElement>, WithDimension {
   /// The painter of this canvas.
   PCanvasPainter get painter;
 
@@ -274,17 +286,137 @@ abstract class PCanvas with WithDimension {
 
   PCanvas.impl();
 
-  factory PCanvas(int width, int height, PCanvasPainter painter) {
-    return createPCanvasImpl(width, height, painter);
+  factory PCanvas(int width, int height, PCanvasPainter painter,
+      {PCanvasPixels? initialPixels}) {
+    return createPCanvasImpl(width, height, painter,
+        initialPixels: initialPixels);
+  }
+
+  /// Sets the canvas pixels.
+  void setPixels(PCanvasPixels pixels,
+      {int x = 0, int y = 0, int? width, int? height});
+
+  /// The current transformation of the canvas operation.
+  PcanvasTransform transform = PcanvasTransform.none;
+
+  /// Sets [transform] to a sub-transformation, merging the current [transform]
+  /// with [transform2].
+  set subTransform(PcanvasTransform transform2) {
+    if (transform2.isZeroTransformation) return;
+
+    var prevT = transform;
+    if (prevT.isZeroTransformation) {
+      transform = transform2;
+    } else {
+      var subT = transform + transform2;
+      transform = subT;
+    }
+  }
+
+  /// The current drawing state.
+  PCanvasState get state =>
+      PCanvasState(transform: transform, clip: clip, stateExtra: stateExtra);
+
+  /// The platform specific extra states.
+  PCanvasStateExtra? get stateExtra;
+
+  final QueueList<PCanvasState> _stateStack = QueueList<PCanvasState>();
+
+  /// Saves the drawing state ([PCanvasState]).
+  PCanvasState saveState() {
+    var s = state;
+    _stateStack.addLast(s);
+
+    return s;
+  }
+
+  /// Restores the drawing [state].
+  PCanvasState? restoreState({PCanvasState? expectedState}) {
+    if (_stateStack.isEmpty) {
+      throw StateError(
+          "State stack error: `saveState`/`restoreState` not properly called.");
+    }
+
+    var s = _stateStack.removeLast();
+
+    transform = s.transform;
+    clip = s.clip;
+
+    if (expectedState != null && !identical(s, expectedState)) {
+      throw StateError(
+          "State stack error: `expectedState` not matching the last instance in stack.");
+    }
+
+    return s;
+  }
+
+  /// Executes [call] preserving the internal drawing [state].
+  ///
+  /// See [saveState] and [restoreState].
+  R callWithGuardedState<R>(R Function() call) {
+    saveState();
+
+    var restored = false;
+
+    try {
+      var ret = call();
+
+      if (ret is Future) {
+        return ret.whenComplete(() {
+          restored = true;
+          restoreState();
+        }) as R;
+      } else {
+        restored = true;
+        restoreState();
+        return ret;
+      }
+    } finally {
+      if (!restored) {
+        restoreState();
+      }
+    }
+  }
+
+  /// Executes [call] preserving the internal drawing state, accepting [Future]
+  /// as return value.
+  ///
+  /// See [saveState] and [restoreState].
+  FutureOr<R> callWithGuardedStateAsync<R>(FutureOr<R> Function() call) {
+    saveState();
+
+    var restored = false;
+
+    try {
+      var ret = call();
+
+      if (ret is Future<R>) {
+        return ret.whenComplete(() {
+          restored = true;
+          restoreState();
+        });
+      } else {
+        restored = true;
+        restoreState();
+        return ret;
+      }
+    } finally {
+      if (!restored) {
+        restoreState();
+      }
+    }
   }
 
   final List<PCanvasElement> _elements = <PCanvasElement>[];
 
-  List<PCanvasElement> get elements =>
+  @override
+  UnmodifiableListView<PCanvasElement> get elements =>
       UnmodifiableListView<PCanvasElement>(_elements);
 
+  @override
   bool get hasElements => _elements.isNotEmpty;
 
+  @override
   void clearElements() {
     if (_elements.isNotEmpty) {
       _elements.clear();
@@ -292,12 +424,14 @@ abstract class PCanvas with WithDimension {
     }
   }
 
+  @override
   void addElement(PCanvasElement element) {
     _elements.add(element);
     _elements.sortByZIndex();
     requestRepaint();
   }
 
+  @override
   bool removeElement(PCanvasElement element) {
     var rm = _elements.remove(element);
     if (rm) {
@@ -454,11 +588,51 @@ abstract class PCanvas with WithDimension {
 
   /// Clears the canvas.
   /// - Applies [style] if provided.
-  void clear({PStyle? style}) => clearRect(0, 0, width, height, style: style);
+  void clear({PStyle? style}) {
+    saveState();
+
+    transform = PcanvasTransform.none;
+    clearRect(0, 0, width, height, style: style);
+
+    restoreState();
+  }
 
   /// Clears a part of the canvas.
   /// - Applies [style] if provided.
   void clearRect(num x, num y, num width, num height, {PStyle? style});
+
+  /// Sets the drawing clip.
+  /// - Same as `this.clip = rect`.
+  /// - See [clip].
+  void setClip(num x, num y, num width, num height) =>
+      clip = PRectangle(x, y, width, height);
+
+  /// Sets [clip] merging the passed coordinates with the previous clip.
+  /// - See [subClip].
+  void setSubClip(num x, num y, num width, num height) =>
+      subClip = PRectangle(x, y, width, height);
+
+  /// Returns the current drawing clip.
+  PRectangle? get clip;
+
+  /// Sets the drawing clip.
+  /// - Note that the [clip] won't be merged with the previouse clip
+  ///   (the clip coordinates are always global).
+  /// - See [subClip].
+  set clip(PRectangle? clip);
+
+  /// Sets [clip] merging the coordinates of [clip2] with the previous clip.
+  set subClip(PRectangle? clip2) {
+    if (clip2 == null) return;
+
+    var clip = this.clip;
+    if (clip == null) {
+      this.clip = clip2;
+    } else {
+      var subClip = clip.intersection(clip2);
+      this.clip = subClip;
+    }
+  }
 
   /// Draw an [image] at ([x],[y]) using the original dimension of the [image].
   void drawImage(PCanvasImage image, num x, num y);
@@ -624,8 +798,16 @@ abstract class PCanvas with WithDimension {
 
   /// Returns a data URI containing the canvas data in PNG format.
   /// See [toPNG].
-  FutureOr<String> toDataUrl() async {
-    var pngData = await toPNG();
+  FutureOr<String> toDataUrl() {
+    var pngData = toPNG();
+    if (pngData is Future<Uint8List>) {
+      return pngData.then(_toDataUrlImpl);
+    } else {
+      return _toDataUrlImpl(pngData);
+    }
+  }
+
+  String _toDataUrlImpl(Uint8List pngData) {
     var dataBase64 = base64.encode(pngData);
 
     var url = StringBuffer();
@@ -633,6 +815,58 @@ abstract class PCanvas with WithDimension {
     url.write(dataBase64);
 
     return url.toString();
+  }
+}
+
+class PCanvasState {
+  final PcanvasTransform transform;
+  final PRectangle? clip;
+  final PCanvasStateExtra? stateExtra;
+
+  const PCanvasState(
+      {this.transform = PcanvasTransform.none, this.clip, this.stateExtra});
+
+  @override
+  String toString() {
+    return 'PCanvasState{transform: $transform, clip: $clip, stateExtra: $stateExtra}';
+  }
+}
+
+abstract class PCanvasStateExtra {}
+
+/// [PCanvas] transformation.
+class PcanvasTransform {
+  static const PcanvasTransform none = PcanvasTransform();
+
+  final num translateX;
+
+  final num translateY;
+
+  const PcanvasTransform({this.translateX = 0, this.translateY = 0});
+
+  bool get isZeroTranslation => translateX == 0 && translateY == 0;
+
+  bool get isZeroTransformation => isZeroTranslation;
+
+  Point get translate => Point(translateX, translateY);
+
+  num x(num x) => translateX + x;
+
+  num y(num y) => translateY + y;
+
+  double xD(num x) => this.x(x).toDouble();
+
+  double yD(num y) => this.y(y).toDouble();
+
+  Point point(Point p) => Point(x(p.x), y(p.y));
+
+  PcanvasTransform operator +(PcanvasTransform other) => PcanvasTransform(
+      translateX: translateX + other.translateX,
+      translateY: translateY + other.translateY);
+
+  @override
+  String toString() {
+    return 'PcanvasTransform{translate: ($translateX, $translateY)}';
   }
 }
 
@@ -649,7 +883,13 @@ abstract class PCanvasPixels {
   /// See [format].
   final Uint32List pixels;
 
-  PCanvasPixels(this.width, this.height, this.pixels);
+  PCanvasPixels.blank(this.width, this.height)
+      : pixels = Uint32List(width * height);
+
+  PCanvasPixels.fromPixels(this.width, this.height, this.pixels);
+
+  /// Creates a blank [PCanvasPixels] instance with the same [format] of this one.
+  PCanvasPixels createBlank(int width, int height);
 
   /// Length of [pixels].
   int get length => pixels.length;
@@ -660,6 +900,8 @@ abstract class PCanvasPixels {
   /// The pixel format.
   String get format;
 
+  bool isSameFormat(PCanvasPixels other);
+
   /// Formats [color] to this instance [format].
   int formatColor(PColor color);
 
@@ -669,7 +911,7 @@ abstract class PCanvasPixels {
   /// Index of a pixel ([x],[y]) at [pixels].
   int pixelIndex(int x, int y) => (width * y) + x;
 
-  /// Returns a pixel at ([x],[y]) in the format 4-byte Uint32 integer in #AABBGGRR channel order.
+  /// Returns a pixel at ([x],[y]) in the format 4-byte Uint32 integer in [format].
   int pixel(int x, int y) => pixels[pixelIndex(x, y)];
 
   /// Returns a pixel at ([x],[y]) as [PColor].
@@ -687,11 +929,97 @@ abstract class PCanvasPixels {
   /// Returns the Alpha channel of [pixel] at ([x],[y]).
   int pixelA(int x, int y);
 
+  /// Sets a pixels at ([x],[y]) with value [p].
+  /// - [p] is expected to be in the same [format] of this instances [pixels].
+  void setPixel(int x, int y, int p) => pixels[pixelIndex(x, y)] = p;
+
+  void _checkSameFormat(PCanvasPixels src) {
+    if (!isSameFormat(src)) {
+      throw StateError(
+          "Parameter `src` not of same format> src: ${src.format} ; this: $format");
+    }
+  }
+
+  /// Sets a pixels at ([dstX],[dstY]) with value from [src] at ([srcX],[srcY]).
+  void setPixelFrom(PCanvasPixels src, int srcX, int srcY, int dstX, int dstY) {
+    _checkSameFormat(src);
+    _setPixelFromImpl(src, srcX, srcY, dstX, dstY);
+  }
+
+  void _setPixelFromImpl(
+      PCanvasPixels src, int srcX, int srcY, int dstX, int dstY) {
+    pixels[pixelIndex(dstX, dstY)] = src.pixel(srcX, srcY);
+  }
+
+  void setPixelsLineFrom(
+      PCanvasPixels src, int srcX, int srcY, int dstX, int dstY, int width) {
+    _checkSameFormat(src);
+
+    for (var i = 0; i < width; ++i) {
+      _setPixelFromImpl(src, srcX + i, srcY, dstX + i, dstY);
+    }
+  }
+
+  void setPixelsColumnFrom(
+      PCanvasPixels src, int srcX, int srcY, int dstX, int dstY, int height) {
+    _checkSameFormat(src);
+
+    for (var i = 0; i < height; ++i) {
+      _setPixelFromImpl(src, srcX, srcY + i, dstX, dstY + i);
+    }
+  }
+
+  void setPixelsRectFrom(PCanvasPixels src, int srcX, int srcY, int dstX,
+      int dstY, int width, int height) {
+    _checkSameFormat(src);
+
+    final srcPixels = src.pixels;
+
+    for (var y = 0; y < height; ++y) {
+      var srcIndex = src.pixelIndex(srcX, srcY + y);
+      var dstIndex = pixelIndex(dstX, dstY + y);
+
+      for (var x = 0; x < width; ++x) {
+        pixels[dstIndex + x] = srcPixels[srcIndex + x];
+      }
+    }
+  }
+
+  void putPixels(PCanvasPixels src, num dstX, num dstY) => setPixelsRectFrom(
+      src, 0, 0, dstX.toInt(), dstY.toInt(), src.width, src.height);
+
+  PCanvasPixels? copyRectangle(PRectangle r) =>
+      copyRect(r.x.toInt(), r.y.toInt(), r.width.toInt(), r.height.toInt());
+
+  PCanvasPixels? copyRect(int x, int y, int width, int height) {
+    if (width <= 0 || height <= 0) return null;
+
+    var rect = createBlank(width, height);
+    rect.setPixelsRectFrom(this, x, y, 0, 0, width, height);
+    return rect;
+  }
+
   PCanvasPixelsARGB toPCanvasPixelsARGB();
 
   PCanvasPixelsABGR toPCanvasPixelsABGR();
 
   PCanvasPixelsRGBA toPCanvasPixelsRGBA();
+
+  PCanvas toPCanvas({PCanvasPainter? painter}) {
+    var pCanvas = PCanvas(width, height, painter ?? PCanvasPainterDummy(),
+        initialPixels: this);
+    return pCanvas;
+  }
+
+  FutureOr<Uint8List> toPNG() {
+    var pCanvas = toPCanvas();
+    return pCanvas.toPNG();
+  }
+
+  FutureOr<String> toDataUrl() {
+    var pCanvas = toPCanvas();
+    return pCanvas.toDataUrl();
+  }
 
   @override
   String toString() {
@@ -701,10 +1029,20 @@ abstract class PCanvasPixels {
 
 /// [PCanvasPixels] in `ARGB` format.
 class PCanvasPixelsARGB extends PCanvasPixels {
-  PCanvasPixelsARGB(super.width, super.height, super.pixels) : super();
+  PCanvasPixelsARGB.blank(super.width, super.height) : super.blank();
+
+  PCanvasPixelsARGB.fromPixels(super.width, super.height, super.pixels)
+      : super.fromPixels();
 
   @override
   String get format => 'ARGB';
+
+  @override
+  bool isSameFormat(PCanvasPixels other) => other is PCanvasPixelsARGB;
+
+  @override
+  PCanvasPixelsARGB createBlank(int width, int height) =>
+      PCanvasPixelsARGB.blank(width, height);
 
   @override
   int formatColor(PColor color) => color.argb;
@@ -732,7 +1070,7 @@ class PCanvasPixelsARGB extends PCanvasPixels {
   PCanvasPixelsARGB toPCanvasPixelsARGB() => this;
 
   @override
-  PCanvasPixelsABGR toPCanvasPixelsABGR() => PCanvasPixelsABGR(
+  PCanvasPixelsABGR toPCanvasPixelsABGR() => PCanvasPixelsABGR.fromPixels(
       width,
       height,
       Uint32List.fromList(pixels.map((p) {
@@ -745,7 +1083,7 @@ class PCanvasPixelsARGB extends PCanvasPixels {
       }).toList(growable: false)));
 
   @override
-  PCanvasPixelsRGBA toPCanvasPixelsRGBA() => PCanvasPixelsRGBA(
+  PCanvasPixelsRGBA toPCanvasPixelsRGBA() => PCanvasPixelsRGBA.fromPixels(
       width,
       height,
       Uint32List.fromList(pixels.map((p) {
@@ -760,10 +1098,20 @@ class PCanvasPixelsARGB extends PCanvasPixels {
 
 /// [PCanvasPixels] in `ABGR` format.
 class PCanvasPixelsABGR extends PCanvasPixels {
-  PCanvasPixelsABGR(super.width, super.height, super.pixels) : super();
+  PCanvasPixelsABGR.blank(super.width, super.height) : super.blank();
+
+  PCanvasPixelsABGR.fromPixels(super.width, super.height, super.pixels)
+      : super.fromPixels();
 
   @override
   String get format => 'ABGR';
+
+  @override
+  bool isSameFormat(PCanvasPixels other) => other is PCanvasPixelsABGR;
+
+  @override
+  PCanvasPixelsABGR createBlank(int width, int height) =>
+      PCanvasPixelsABGR.blank(width, height);
 
   @override
   int formatColor(PColor color) => color.abgr;
@@ -788,7 +1136,7 @@ class PCanvasPixelsABGR extends PCanvasPixels {
   int pixelR(int x, int y) => (pixel(x, y) & 0xff);
 
   @override
-  PCanvasPixelsARGB toPCanvasPixelsARGB() => PCanvasPixelsARGB(
+  PCanvasPixelsARGB toPCanvasPixelsARGB() => PCanvasPixelsARGB.fromPixels(
       width,
       height,
       Uint32List.fromList(pixels.map((p) {
@@ -804,7 +1152,7 @@ class PCanvasPixelsABGR extends PCanvasPixels {
   PCanvasPixelsABGR toPCanvasPixelsABGR() => this;
 
   @override
-  PCanvasPixelsRGBA toPCanvasPixelsRGBA() => PCanvasPixelsRGBA(
+  PCanvasPixelsRGBA toPCanvasPixelsRGBA() => PCanvasPixelsRGBA.fromPixels(
       width,
       height,
       Uint32List.fromList(pixels.map((p) {
@@ -819,10 +1167,20 @@ class PCanvasPixelsABGR extends PCanvasPixels {
 
 /// [PCanvasPixels] in `RGBA` format.
 class PCanvasPixelsRGBA extends PCanvasPixels {
-  PCanvasPixelsRGBA(super.width, super.height, super.pixels) : super();
+  PCanvasPixelsRGBA.blank(super.width, super.height) : super.blank();
+
+  PCanvasPixelsRGBA.fromPixels(super.width, super.height, super.pixels)
+      : super.fromPixels();
 
   @override
   String get format => 'RGBA';
+
+  @override
+  bool isSameFormat(PCanvasPixels other) => other is PCanvasPixelsRGBA;
+
+  @override
+  PCanvasPixelsRGBA createBlank(int width, int height) =>
+      PCanvasPixelsRGBA.blank(width, height);
 
   @override
   int formatColor(PColor color) => color.rgba;
@@ -847,7 +1205,7 @@ class PCanvasPixelsRGBA extends PCanvasPixels {
   int pixelA(int x, int y) => (pixel(x, y) & 0xff);
 
   @override
-  PCanvasPixelsARGB toPCanvasPixelsARGB() => PCanvasPixelsARGB(
+  PCanvasPixelsARGB toPCanvasPixelsARGB() => PCanvasPixelsARGB.fromPixels(
       width,
       height,
       Uint32List.fromList(pixels.map((p) {
@@ -860,7 +1218,7 @@ class PCanvasPixelsRGBA extends PCanvasPixels {
       }).toList(growable: false)));
 
   @override
-  PCanvasPixelsABGR toPCanvasPixelsABGR() => PCanvasPixelsABGR(
+  PCanvasPixelsABGR toPCanvasPixelsABGR() => PCanvasPixelsABGR.fromPixels(
       width,
       height,
       Uint32List.fromList(pixels.map((p) {
@@ -1025,6 +1383,14 @@ class PColorRGB extends PColor {
     return math.max(rd, math.max(gd, math.max(bd, ad)));
   }
 
+  int distanceR(PColorRGB other) => (r - other.r).abs();
+
+  int distanceG(PColorRGB other) => (g - other.g).abs();
+
+  int distanceB(PColorRGB other) => (b - other.b).abs();
+
+  int distanceA(PColorRGB other) => (a - other.a).abs();
+
   @override
   PColorRGB toPColorRGB() => this;
 
@@ -1068,6 +1434,8 @@ class PColorRGB extends PColor {
 
   @override
   String toString() => toRGB();
+
+  PStyle toStyle({int? size}) => PStyle(color: this, size: size);
 }
 
 class PColorRGBA extends PColorRGB {
@@ -1141,6 +1509,8 @@ class PColorRGBA extends PColorRGB {
 }
 
 class PStyle {
+  static const PStyle none = PStyle();
+
   final PColor? color;
   final int? size;
 
@@ -1162,6 +1532,9 @@ class PStyle {
 
   @override
   int get hashCode => color.hashCode ^ size.hashCode;
+
+  @override
+  String toString() => 'PStyle{color: $color, size: $size}';
 }
 
 abstract class WithDimension {
@@ -1212,6 +1585,9 @@ class PDimension with WithDimension {
 
   @override
   int get hashCode => width.hashCode ^ height.hashCode;
+
+  PRectangle toPRectangle({num x = 0, num y = 0}) =>
+      PRectangle(x, y, width, height);
 }
 
 /// A [PCanvas] rectangle.
@@ -1222,13 +1598,57 @@ class PRectangle extends PDimension {
   /// The Y coordinate.
   final num y;
 
-  PRectangle(this.x, this.y, super.width, super.height);
+  const PRectangle(this.x, this.y, super.width, super.height);
 
   PRectangle.fromDimension(num x, num y, PDimension dimension)
       : this(x, y, dimension.width, dimension.height);
 
+  factory PRectangle.fromPoints(Point p1, Point p2) =>
+      PRectangle.fromCoordinates(p1.x, p1.y, p2.x, p2.y);
+
+  factory PRectangle.fromCoordinates(num x1, num y1, num x2, num y2) {
+    if (x2 < x1) {
+      var tmp = x1;
+      x1 = x2;
+      x2 = tmp;
+    }
+
+    if (y2 < y1) {
+      var tmp = y1;
+      y1 = y2;
+      y2 = tmp;
+    }
+
+    return PRectangle(x1, y1, x2 - x1, y2 - y1);
+  }
+
   PRectangle copyWith({num? x, num? y, num? width, num? height}) => PRectangle(
       x ?? this.x, y ?? this.y, width ?? this.width, height ?? this.height);
+
+  /// Increments [x] by [n].
+  PRectangle incrementX(num n) => PRectangle(x + n, y, width, height);
+
+  /// Increments [y] by [n].
+  PRectangle incrementY(num n) => PRectangle(x, y + n, width, height);
+
+  /// Increments [x],[y] by [nX],[nY],
+  PRectangle incrementXY(num nX, num nY) =>
+      PRectangle(x + nX, y + nY, width, height);
+
+  /// Translate this rectangle.
+  ///
+  /// - Alias for [incrementXY].
+  PRectangle translate(num x, num y) => incrementXY(x, y);
+
+  /// Increments [width] by [n].
+  PRectangle incrementWidth(num n) => PRectangle(x, y, width + n, height);
+
+  /// Increments [height] by [n].
+  PRectangle incrementHeight(num n) => PRectangle(x, y, width, height + n);
+
+  /// Increments [width],[height] by [nW],[nH].
+  PRectangle incrementWH(num nW, num nH) =>
+      PRectangle(x, y, width + nW, height + nH);
 
   @override
   PRectangle get dimension => this;
@@ -1237,13 +1657,99 @@ class PRectangle extends PDimension {
   @override
   Point get center => Point(x + width ~/ 2, y + height ~/ 2);
 
+  /// Returns: `x + width`
+  num get maxX => x + width;
+
+  /// Returns: `y + height`
+  num get maxY => y + height;
+
+  /// Returns `true` if [r] intersects this rectangle.
+  bool intersectsRectangle(PRectangle r) =>
+      intersects(r.x, r.y, r.width, r.height);
+
+  /// Returns `true` this rectangle intersects with [x],[y] , [width],[height].
+  bool intersects(num x, num y, num width, num height) {
+    final mx = this.x;
+    final my = this.y;
+    final mw = this.width;
+    final mh = this.height;
+    return width > 0 &&
+        height > 0 &&
+        mw > 0 &&
+        mh > 0 &&
+        x < mx + mw &&
+        x + width > mx &&
+        y < my + mh &&
+        y + height > my;
+  }
+
+  /// Returns the intersection between this rectangle and [r].
+  PRectangle intersection(PRectangle r) {
+    final src1 = this;
+    final src2 = r;
+
+    final x = math.max(src1.x, src2.x);
+    final y = math.max(src1.y, src2.y);
+
+    final maxx = math.min(src1.maxX, src2.maxX);
+    final maxy = math.min(src1.maxY, src2.maxY);
+
+    return PRectangle(x, y, maxx - x, maxy - y);
+  }
+
+  /// Returns `true` if this rectangle contains the rectangle [r].
+  bool containsRectangle(PRectangle r) => contains(r.x, r.y, r.width, r.height);
+
+  /// Returns `true` if this rectangle contains the rectangle [x],[y] , [width],[height].
+  bool contains(num x, num y, num width, num height) {
+    final mx = this.x;
+    final my = this.y;
+    final mw = this.width;
+    final mh = this.height;
+
+    return width > 0 &&
+        height > 0 &&
+        mw > 0 &&
+        mh > 0 &&
+        x >= mx &&
+        (x + width) <= (mx + mw) &&
+        y >= my &&
+        (y + height) <= (my + mh);
+  }
+
+  /// Returns `true` if this rectangle contains the point [p].
+  bool containsPoint(Point p) => containsXY(p.x, p.y);
+
+  /// Returns `true` if this rectangle contains the coordinates [x],[y].
+  bool containsXY(num x, num y) {
+    final mx = this.x;
+    final my = this.y;
+    var w = width;
+    var h = height;
+    return w > 0 && h > 0 && x >= mx && x < (mx + w) && y >= my && y < (my + h);
+  }
+
+  PRectangle transform(PcanvasTransform t) {
+    return PRectangle(x + t.translateX, y + t.translateY, width, height);
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other && other is PRectangle && x == other.x && y == other.y;
+      super == other &&
+          other is PRectangle &&
+          x == other.x &&
+          y == other.y &&
+          width == other.width &&
+          height == other.height;
 
   @override
-  int get hashCode => super.hashCode ^ x.hashCode ^ y.hashCode;
+  int get hashCode =>
+      super.hashCode ^
+      x.hashCode ^
+      y.hashCode ^
+      width.hashCode ^
+      height.hashCode;
 
   @override
   String toString() {
@@ -1294,6 +1800,9 @@ class PTextMetric extends PDimension {
 
 /// A [PCanvas] font.
 class PFont {
+  /// This `dummy` instance shoudn't be used in paint operations.
+  static final PFont dummy = PFont('', 0);
+
   /// The family of the font.
   final String family;
 
@@ -1333,15 +1842,42 @@ class PFont {
   int get hashCode => family.hashCode ^ size.hashCode;
 }
 
+abstract class Position {
+  /// The resolved X coordinate.
+  num get x;
+
+  /// The resolved Y coordinate.
+  num get y;
+
+  /// Sets the X coordinate.
+  Position setX(num x);
+
+  /// Sets the Y coordinate.
+  Position setY(num y);
+
+  /// Increments the X coordinate by [n]
+  Position incrementX(num n);
+
+  /// Increments the Y coordinate by [n]
+  Position incrementY(num n);
+
+  /// Increments the X,Y coordinates by [nX] and [nY].
+  Position incrementXY(num nX, num nY);
+}
+
 /// A [PCanvas] point.
-class Point {
+class Point implements Position {
   /// The X coordinate.
+  @override
   final num x;
 
   /// The Y coordinate.
+  @override
   final num y;
 
   const Point(this.x, this.y);
+
+  bool get isZero => x == 0 && y == 0;
 
   @override
   String toString() {
@@ -1354,6 +1890,50 @@ class Point {
 
   @override
   int get hashCode => x.hashCode ^ y.hashCode;
+
+  @override
+  Position setX(num x) => Point(x, y);
+
+  @override
+  Position setY(num y) => Point(x, y);
+
+  @override
+  Point incrementX(num n) => Point(x + n, y);
+
+  @override
+  Point incrementY(num n) => Point(x, y + n);
+
+  @override
+  Point incrementXY(num nX, num nY) => Point(x + nX, y + nY);
+}
+
+extension ListPointExtension on List<Point> {
+  PRectangle? get boundingBox {
+    var length = this.length;
+    if (length == 0) return null;
+
+    var p0 = this[0];
+
+    num minX, minY, maxX, maxY;
+
+    minX = maxX = p0.x;
+    minY = maxY = p0.y;
+
+    for (var i = 1; i < length; ++i) {
+      var p = this[i];
+
+      var x = p.x;
+      var y = p.y;
+
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+
+    return PRectangle.fromCoordinates(minX, minY, maxX, maxY);
+  }
 }
 
 extension ListPCanvasImageExtension on List<PCanvasImage> {

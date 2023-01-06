@@ -38,14 +38,22 @@ class PCanvasHTML extends PCanvas {
   @override
   num get height => (_canvas.height ?? 0);
 
-  PCanvasHTML(int width, int height, this.painter) : super.impl() {
+  late final PCanvasHTMLStateExtra _initialStateExtra;
+
+  PCanvasHTML(int width, int height, this.painter,
+      {PCanvasPixels? initialPixels})
+      : super.impl() {
     _canvas = CanvasElement(width: width, height: height);
 
     _ctx = (_canvas.getContext('2d', {'willReadFrequently': true})
             as CanvasRenderingContext2D?) ??
         _canvas.context2D;
 
-    _setFont(PFont('Arial', 10));
+    // Saves the initial drawing state to allow `_resetCtx`.
+    _ctx.save();
+    _initialStateExtra = PCanvasHTMLStateExtra._(_ctx);
+
+    _setFont(PFont('Arial', 14));
     _setStrokeStyle(PStyle(color: PColor.colorBlack, size: 1));
     _setFillStyle(PStyle(color: PColor.colorWhite));
 
@@ -61,7 +69,23 @@ class PCanvasHTML extends PCanvas {
     _resizeObserver.observe(_canvas);
 
     _setup();
-    _initialize();
+    _initialize(initialPixels);
+  }
+
+  @override
+  void setPixels(PCanvasPixels pixels,
+      {int x = 0, int y = 0, int? width, int? height}) {
+    pixels = pixels.toPCanvasPixelsABGR();
+
+    var pixelsData = pixels.pixels;
+    var pixelsDataBuffer = pixelsData.buffer;
+
+    var bytes = pixelsDataBuffer.asUint8ClampedList(
+        pixelsData.offsetInBytes, pixelsData.lengthInBytes);
+
+    var imageData = ImageData(bytes, pixels.width, pixels.height);
+
+    _ctx.putImageData(imageData, x, y, 0, 0, pixels.width, pixels.height);
   }
 
   @override
@@ -129,7 +153,11 @@ class PCanvasHTML extends PCanvas {
   @override
   FutureOr<bool> waitLoading() => painter.waitLoading();
 
-  void _initialize() {
+  void _initialize(PCanvasPixels? initialPixels) {
+    if (initialPixels != null) {
+      setPixels(initialPixels);
+    }
+
     var ret = painter.callLoadResources(this);
 
     if (ret is Future<bool>) {
@@ -190,7 +218,93 @@ class PCanvasHTML extends PCanvas {
   }
 
   @override
+  PCanvasStateExtra get stateExtra => PCanvasHTMLStateExtra._(_ctx);
+
+  @override
+  PCanvasState? restoreState({PCanvasState? expectedState}) {
+    _ctx.resetTransform();
+
+    final s = super.restoreState(expectedState: expectedState);
+
+    var stateExtra = s?.stateExtra as PCanvasHTMLStateExtra?;
+    stateExtra?.setContext(_ctx);
+
+    return s;
+  }
+
+  PRectangle? _clip;
+
+  @override
+  PRectangle? get clip => _clip;
+
+  void _setClipGlobal(Path2D clipPath) {
+    var stateExtra = PCanvasHTMLStateExtra._(_ctx);
+
+    _resetCtx();
+
+    _ctx.clip(clipPath);
+    stateExtra.setContext(_ctx);
+  }
+
+  @override
+  set clip(PRectangle? clip) {
+    if (clip == null) {
+      if (_clip != null) {
+        var rect = Path2D()..rect(0, 0, width, height);
+        _setClipGlobal(rect);
+        _clip = null;
+      }
+    } else {
+      if (_clip != clip) {
+        var clipPath = clip.asPath2D;
+        _setClipGlobal(clipPath);
+        _clip = clip;
+      }
+    }
+  }
+
+  @override
+  set subClip(PRectangle? clip2) {
+    if (clip2 == null) return;
+
+    var prevClip = clip;
+    if (prevClip == null) {
+      var clipPath = clip2.asPath2D;
+      _ctx.clip(clipPath);
+      _clip = clip2;
+    } else {
+      var subClip = prevClip.intersection(clip2);
+      var clipPath = subClip.asPath2D;
+      _ctx.clip(clipPath);
+      _clip = subClip;
+    }
+  }
+
+  /// Resets the [Canvas] [CanvasRenderingContext2D].
+  ///
+  /// - Note that [CanvasRenderingContext2D.save] and [CanvasRenderingContext2D.restore]
+  ///   are only used in this method, to ensure that it can `reset` to the original
+  ///   state (including clip), saved at construction.
+  void _resetCtx() {
+    _ctx.restore();
+    _ctx.resetTransform();
+    _initialStateExtra.setContext(_ctx);
+    _ctx.save();
+
+    _clearSetStates();
+  }
+
+  @override
+  void clear({PStyle? style}) {
+    _resetCtx();
+    super.clear(style: style);
+  }
+
+  @override
   void clearRect(num x, num y, num width, num height, {PStyle? style}) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
     width = canvasX(width);
@@ -206,6 +320,9 @@ class PCanvasHTML extends PCanvas {
   @override
   void drawImage(PCanvasImage image, num x, num y) {
     checkImageLoaded(image);
+
+    x = transform.x(x);
+    y = transform.y(y);
 
     x = canvasX(x);
     y = canvasY(y);
@@ -232,6 +349,9 @@ class PCanvasHTML extends PCanvas {
       PCanvasImage image, num x, num y, num width, num height) {
     checkImageLoaded(image);
 
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
     width = canvasX(width);
@@ -256,6 +376,9 @@ class PCanvasHTML extends PCanvas {
       int srcHeight, num dstX, num dstY, num dstWidth, num dstHeight) {
     checkImageLoaded(image);
 
+    dstX = transform.x(dstX);
+    dstY = transform.y(dstY);
+
     dstX = canvasX(dstX);
     dstY = canvasY(dstY);
     dstWidth = canvasX(dstWidth);
@@ -271,29 +394,58 @@ class PCanvasHTML extends PCanvas {
 
   @override
   void strokeRect(num x, num y, num width, num height, PStyle style) {
+    if (width == 1 || height == 1) {
+      fillRect(x, y, width, height, style);
+      return;
+    }
+
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
     width = canvasX(width);
     height = canvasY(height);
 
-    _setStrokeStyle(style);
+    if (width <= 0 || height <= 0) return;
+
+    final size = _setStrokeStyle(style);
+
+    if (size % 2 != 0) {
+      x += 0.5;
+      y += 0.5;
+      --width;
+      --height;
+    }
+
+    //_ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+
     _ctx.strokeRect(x, y, width, height);
   }
 
   @override
   void fillRect(num x, num y, num width, num height, PStyle style) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
     width = canvasX(width);
     height = canvasY(height);
 
+    if (width <= 0 || height <= 0) return;
+
     _setFillStyle(style);
+
     _ctx.fillRect(x, y, width, height);
   }
 
   @override
   void strokeCircle(num x, num y, num radius, PStyle style,
       {num startAngle = 0, num endAngle = 360}) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
     radius = canvasX(radius);
@@ -311,6 +463,9 @@ class PCanvasHTML extends PCanvas {
   @override
   void fillCircle(num x, num y, num radius, PStyle style,
       {num startAngle = 0, num endAngle = 360}) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
     radius = canvasX(radius);
@@ -328,6 +483,9 @@ class PCanvasHTML extends PCanvas {
   @override
   void fillTopDownGradient(
       num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     var grd = _ctx.createLinearGradient(x, y, x, y + height);
     grd.addColorStop(0, colorFrom.toString());
     grd.addColorStop(1, colorTo.toString());
@@ -339,6 +497,9 @@ class PCanvasHTML extends PCanvas {
   @override
   void fillLeftRightGradient(
       num x, num y, num width, num height, PColor colorFrom, PColor colorTo) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     var grd = _ctx.createLinearGradient(x, y, x + width, y);
     grd.addColorStop(0, colorFrom.toString());
     grd.addColorStop(1, colorTo.toString());
@@ -374,6 +535,9 @@ class PCanvasHTML extends PCanvas {
 
   @override
   void drawText(String text, num x, num y, PFont font, PStyle style) {
+    x = transform.x(x);
+    y = transform.y(y);
+
     x = canvasX(x);
     y = canvasY(y);
 
@@ -411,12 +575,18 @@ class PCanvasHTML extends PCanvas {
       for (var i = 0; i < path.length; i += 2) {
         var x = path[i];
         var y = path[i + 1];
+
+        x = transform.x(x);
+        y = transform.y(y);
+
         x = canvasX(x);
         y = canvasY(y);
         _ctx.lineTo(x, y);
       }
     } else if (path is List<Point>) {
       for (var p in path) {
+        p = transform.point(p);
+
         p = canvasPoint(p);
         _ctx.lineTo(p.x, p.y);
       }
@@ -426,10 +596,15 @@ class PCanvasHTML extends PCanvas {
         if (e is num) {
           var x = e;
           var y = path[++i];
+
+          x = transform.x(x);
+          y = transform.y(y);
+
           x = canvasX(x);
           y = canvasY(y);
           _ctx.lineTo(x, y);
         } else if (e is Point) {
+          e = transform.point(e);
           e = canvasPoint(e);
           _ctx.lineTo(e.x, e.y);
         } else {
@@ -444,7 +619,7 @@ class PCanvasHTML extends PCanvas {
     }
   }
 
-  PFont _lastFont = PFont('', 0);
+  PFont _lastFont = PFont.dummy;
   num _lastFontPixelRatio = 0;
 
   void _setFont(PFont font) {
@@ -458,20 +633,24 @@ class PCanvasHTML extends PCanvas {
     _lastFontPixelRatio = pr;
   }
 
-  PStyle _lastStrokeStyle = PStyle();
+  PStyle _lastStrokeStyle = PStyle.none;
 
-  void _setStrokeStyle(PStyle style) {
-    if (style.equals(_lastStrokeStyle)) return;
-
+  int _setStrokeStyle(PStyle style) {
     var size = style.size ?? 1;
+
+    if (style.equals(_lastStrokeStyle)) {
+      return size;
+    }
 
     _ctx.lineWidth = size;
     _ctx.strokeStyle = style.color.toString();
 
     _lastStrokeStyle = style;
+
+    return size;
   }
 
-  PStyle _lastFillStyle = PStyle();
+  PStyle _lastFillStyle = PStyle.none;
 
   void _setFillStyle(PStyle style) {
     if (style.equals(_lastFillStyle)) return;
@@ -484,13 +663,13 @@ class PCanvasHTML extends PCanvas {
 
   void _setFillStyleGradient(CanvasGradient grd) {
     _ctx.fillStyle = grd;
-    _lastFillStyle = PStyle();
+    _lastFillStyle = PStyle.none;
   }
 
   void _clearSetStates() {
-    _lastFont = PFont('', 0);
+    _lastFont = PFont.dummy;
     _lastFontPixelRatio = 0;
-    _lastFillStyle = _lastStrokeStyle = PStyle();
+    _lastFillStyle = _lastStrokeStyle = PStyle.none;
   }
 
   @override
@@ -503,7 +682,8 @@ class PCanvasHTML extends PCanvas {
     var data = imageData.data.buffer.asUint32List(
         imageData.data.offsetInBytes, (imageData.width * imageData.height));
 
-    return PCanvasPixelsABGR(imageData.width, imageData.height, data);
+    return PCanvasPixelsABGR.fromPixels(
+        imageData.width, imageData.height, data);
   }
 
   @override
@@ -535,6 +715,108 @@ class PCanvasHTML extends PCanvas {
   String toString() {
     return 'PCanvasHTML[${width}x$height]$info';
   }
+}
+
+class PCanvasHTMLStateExtra extends PCanvasStateExtra {
+  final Object? strokeStyle;
+  final Object? fillStyle;
+
+  final num globalAlpha;
+
+  final num lineWidth;
+
+  final String lineCap;
+
+  final String lineJoin;
+
+  final num miterLimit;
+
+  //final num lineDashOffset;
+
+  final num shadowOffsetX;
+
+  final num shadowOffsetY;
+
+  final num shadowBlur;
+
+  final String shadowColor;
+
+  final String globalCompositeOperation;
+
+  final String font;
+
+  final String textAlign;
+
+  final String textBaseline;
+
+  final String? direction;
+
+  final bool? imageSmoothingEnabled;
+
+  PCanvasHTMLStateExtra._(CanvasRenderingContext2D ctx)
+      : strokeStyle = ctx.strokeStyle,
+        fillStyle = ctx.fillStyle,
+        globalAlpha = ctx.globalAlpha,
+        lineWidth = ctx.lineWidth,
+        lineCap = ctx.lineCap,
+        lineJoin = ctx.lineJoin,
+        miterLimit = ctx.miterLimit,
+        //lineDashOffset = ctx.lineDashOffset,
+        shadowOffsetX = ctx.shadowOffsetX,
+        shadowOffsetY = ctx.shadowOffsetY,
+        shadowBlur = ctx.shadowBlur,
+        shadowColor = ctx.shadowColor,
+        globalCompositeOperation = ctx.globalCompositeOperation,
+        font = ctx.font,
+        textAlign = ctx.textAlign,
+        textBaseline = ctx.textBaseline,
+        direction = ctx.direction,
+        imageSmoothingEnabled = ctx.imageSmoothingEnabled;
+
+  void setContext(CanvasRenderingContext2D ctx) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.fillStyle = fillStyle;
+    ctx.globalAlpha = globalAlpha;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = lineCap;
+    ctx.lineJoin = lineJoin;
+    ctx.miterLimit = miterLimit;
+    //ctx.lineDashOffset = lineDashOffset;
+    ctx.shadowOffsetX = shadowOffsetX;
+    ctx.shadowOffsetY = shadowOffsetY;
+    ctx.shadowBlur = shadowBlur;
+    ctx.shadowColor = shadowColor;
+    ctx.globalCompositeOperation = globalCompositeOperation;
+    ctx.font = font;
+    ctx.textAlign = textAlign;
+    ctx.textBaseline = textBaseline;
+    ctx.direction = direction;
+    ctx.imageSmoothingEnabled = imageSmoothingEnabled;
+  }
+
+  Map<String, Object?> get properties => <String, Object?>{
+        'strokeStyle': strokeStyle,
+        'fillStyle': fillStyle,
+        'globalAlpha': globalAlpha,
+        'lineWidth': lineWidth,
+        'lineCap': lineCap,
+        'lineJoin': lineJoin,
+        'miterLimit': miterLimit,
+        //'lineDashOffset': lineDashOffset,
+        'shadowOffsetX': shadowOffsetX,
+        'shadowOffsetY': shadowOffsetY,
+        'shadowBlur': shadowBlur,
+        'shadowColor': shadowColor,
+        'globalCompositeOperation': globalCompositeOperation,
+        'font': font,
+        'textAlign': textAlign,
+        'textBaseline': textBaseline,
+        'direction': direction,
+        'imageSmoothingEnabled': imageSmoothingEnabled,
+      };
+
+  @override
+  String toString() => 'PCanvasHTMLStateExtra$properties';
 }
 
 class _PCanvasImageElement extends PCanvasImage {
@@ -595,5 +877,13 @@ extension _KeyboardEventExtension on KeyboardEvent {
   PCanvasKeyEvent toEvent(String type) {
     return PCanvasKeyEvent(
         type, charCode, code, key, ctrlKey, altKey, shiftKey, metaKey);
+  }
+}
+
+extension PRectangleHTMLExtension on PRectangle {
+  Path2D get asPath2D {
+    var p = Path2D();
+    p.rect(x, y, width, height);
+    return p;
   }
 }

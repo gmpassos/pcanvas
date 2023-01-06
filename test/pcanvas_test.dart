@@ -55,9 +55,13 @@ void main() {
     });
 
     void testPixelsFlood(PCanvasPixels pixels, PColor color) {
+      var p = pixels.pixelColor(0, 0);
       var c = pixels.formatColor(color);
+      var dataUrl = pixels.toDataUrl();
+
       expect(
-          pixels.pixels, equals(List.filled(pixels.width * pixels.height, c)));
+          pixels.pixels, equals(List.filled(pixels.width * pixels.height, c)),
+          reason: "$p != $color >> $dataUrl");
     }
 
     Future<void> testCanvasPixelsFlood(
@@ -67,12 +71,14 @@ void main() {
       print(pCanvas);
 
       await pCanvas.waitLoading();
-      pCanvas.callPainter();
+      await pCanvas.callPainter();
 
       expect(pCanvas.painter.isLoadingResources, isFalse);
 
       expect(pCanvas.width, equals(3));
       expect(pCanvas.height, equals(3));
+
+      print(pCanvas.toDataUrl());
 
       var pixels = await pCanvas.pixels;
 
@@ -145,18 +151,20 @@ void main() {
     }
 
     Future<void> testCanvasPixelsRect(
-        PCanvasPainter painter, PColor color) async {
+        PCanvasPainter painter, PColor color, String title) async {
       var pCanvas = PCanvas(3, 3, painter);
 
       print(pCanvas);
 
       await pCanvas.waitLoading();
-      pCanvas.callPainter();
+      await pCanvas.callPainter();
 
       expect(pCanvas.painter.isLoadingResources, isFalse);
 
       expect(pCanvas.width, equals(3));
       expect(pCanvas.height, equals(3));
+
+      await _checkDataUrl(pCanvas, title);
 
       var pixels = await pCanvas.pixels;
 
@@ -194,76 +202,79 @@ void main() {
       }
     }
 
-    test('pixelsRect[red]',
-        () => testCanvasPixelsRect(MyPainterRect1(), PColor.colorRed));
+    test(
+        'pixelsRect[red]',
+        () => testCanvasPixelsRect(
+            MyPainterFillRectRed(), PColor.colorRed, 'pixelsRect[red]'));
 
-    test('pixelsRect[blue]',
-        () => testCanvasPixelsRect(MyPainterRect2(), PColor.colorBlue));
+    test(
+        'pixelsRect[blue]',
+        () => testCanvasPixelsRect(
+            MyPainterFillRectBlue(), PColor.colorBlue, 'pixelsRect[blue]'));
 
-    test('Gradient: top-down', () async {
-      var pCanvas = PCanvas(3, 100, MyPainterGradient1());
+    test('Gradient (top-down)', () async {
+      var pCanvas = PCanvas(10, 100, MyPainterGradient1());
 
       print(pCanvas);
 
       await pCanvas.waitLoading();
-      pCanvas.callPainter();
+      await pCanvas.callPainter();
 
       expect(pCanvas.painter.isLoadingResources, isFalse);
 
-      expect(pCanvas.width, equals(3));
+      expect(pCanvas.width, equals(10));
       expect(pCanvas.height, equals(100));
 
-      var pixels = await pCanvas.pixels;
+      await _checkDataUrl(pCanvas, 'Gradient (top-down)');
 
+      var pixels = await pCanvas.pixels;
       print(pixels);
 
-      expect(pixels.length, equals(3 * 100));
+      print(await pixels.toDataUrl());
 
-      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 3));
+      expect(pixels.length, equals(10 * 100));
 
-      expect(pixels.pixelColor(2, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 3));
+      final dpr = 1;
 
-      expect(pixels.pixelColor(0, 99).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 3));
+      expectPixel(pixels, x: 0, y: 0, t: 3, dpr: dpr);
 
-      expect(pixels.pixelColor(2, 99).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 3));
+      expectPixel(pixels, x: 2, y: 0, t: 3, dpr: dpr);
+
+      expectPixel(pixels, x: 0, y: 99, r: 255, g: 255, b: 255, t: 3, dpr: dpr);
+
+      expectPixel(pixels, x: 2, y: 99, r: 255, g: 255, b: 255, t: 3, dpr: dpr);
     });
 
-    test('Gradient: left-right', () async {
+    test('Gradient (left-right)', () async {
       var pCanvas = PCanvas(512, 3, MyPainterGradient2());
 
       print(pCanvas);
 
       await pCanvas.waitLoading();
-      pCanvas.callPainter();
+      await pCanvas.callPainter();
 
       expect(pCanvas.painter.isLoadingResources, isFalse);
 
       expect(pCanvas.width, equals(512));
       expect(pCanvas.height, equals(3));
 
-      var pixels = await pCanvas.pixels;
+      await _checkDataUrl(pCanvas, 'Gradient (left-right)');
 
+      var pixels = await pCanvas.pixels;
       print(pixels);
 
       expect(pixels.length, equals(3 * 512));
 
-      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 3));
+      // Full background won't be affected by devicePixelRatio.
+      final dpr = 1;
 
-      expect(pixels.pixelColor(0, 2).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 3));
+      expectPixel(pixels, x: 0, y: 0, t: 3, dpr: dpr);
 
-      expect(
-          pixels.pixelColor(511, 0).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 3));
+      expectPixel(pixels, x: 0, y: 2, t: 3, dpr: dpr);
 
-      expect(
-          pixels.pixelColor(511, 2).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 3));
+      expectPixel(pixels, x: 511, y: 0, r: 255, g: 255, b: 255, t: 3, dpr: dpr);
+
+      expectPixel(pixels, x: 511, y: 2, r: 255, g: 255, b: 255, t: 3, dpr: dpr);
     });
 
     test('Text', () async {
@@ -272,91 +283,363 @@ void main() {
       print(pCanvas);
 
       await pCanvas.waitLoading();
-      pCanvas.callPainter();
+      await pCanvas.callPainter();
 
       expect(pCanvas.painter.isLoadingResources, isFalse);
 
       expect(pCanvas.width, equals(30));
       expect(pCanvas.height, equals(15));
 
-      var pixels = await pCanvas.pixels;
+      await _checkDataUrl(pCanvas, 'Text');
 
+      var pixels = await pCanvas.pixels;
       print(pixels);
 
       expect(pixels.length, equals(30 * 15));
 
-      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 40));
+      var dpr = pCanvas.devicePixelRatio;
 
-      expect(pixels.pixelColor(2, 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 0, y: 0, r: 255, g: 255, b: 255, t: 50, dpr: dpr);
 
-      expect(pixels.pixelColor(2, 6).maxDistance(PColorRGBA(255, 255, 255, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 2, y: 2, r: 255, t: 128, tR: 50, dpr: dpr);
 
-      expect(pixels.pixelColor(2, 8).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 1, y: 5, r: 255, g: 255, b: 255, t: 50, dpr: dpr);
     });
 
-    test('Circel1', () async {
-      var pCanvas = PCanvas(10, 10, MyPainterCircle1());
+    test('FillRect3', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterFillRect3());
 
       print(pCanvas);
 
       await pCanvas.waitLoading();
-      pCanvas.callPainter();
+      await pCanvas.callPainter();
 
       expect(pCanvas.painter.isLoadingResources, isFalse);
 
       expect(pCanvas.width, equals(10));
       expect(pCanvas.height, equals(10));
 
-      var pixels = await pCanvas.pixels;
+      await _checkDataUrl(pCanvas, 'FillRect3');
 
+      var pixels = await pCanvas.pixels;
       print(pixels);
 
       expect(pixels.length, equals(10 * 10));
 
-      expect(pixels.pixelColor(0, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      final dpr = 1;
 
-      expect(pixels.pixelColor(9, 0).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 0, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 0, y: 9, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 9, t: 40, dpr: dpr);
 
-      expect(pixels.pixelColor(0, 9).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 2, y: 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 7, y: 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 7, y: 7, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 2, y: 7, t: 1, dpr: dpr);
 
-      expect(pixels.pixelColor(9, 9).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
 
-      expect(pixels.pixelColor(5 - 4, 5).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, r: 255, t: 1, dpr: dpr);
+    });
 
-      expect(pixels.pixelColor(5 + 4, 5).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+    test('StrokeRect1', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterStrokeRect1());
 
-      expect(pixels.pixelColor(5, 5 - 4).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      print(pCanvas);
 
-      expect(pixels.pixelColor(5, 5 + 4).maxDistance(PColorRGBA(0, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
 
-      expect(pixels.pixelColor(5, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expect(pCanvas.painter.isLoadingResources, isFalse);
 
-      expect(pixels.pixelColor(5 - 2, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expect(pCanvas.width, equals(10));
+      expect(pCanvas.height, equals(10));
 
-      expect(pixels.pixelColor(5 + 2, 5).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      await _checkDataUrl(pCanvas, 'StrokeRect1');
 
-      expect(pixels.pixelColor(5, 5 - 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      var pixels = await pCanvas.pixels;
+      print(pixels);
 
-      expect(pixels.pixelColor(5, 5 + 2).maxDistance(PColorRGBA(255, 0, 0, 1)),
-          inInclusiveRange(0, 40));
+      expect(pixels.length, equals(10 * 10));
+
+      final dpr = 1;
+
+      expectPixel(pixels, x: 0, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 0, y: 9, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 9, t: 40, dpr: dpr);
+
+      expectPixel(pixels, x: 2, y: 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 7, y: 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 7, y: 7, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 2, y: 7, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 + 1, y: 3 + 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 2, y: 3 + 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 1, y: 3 + 2, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, t: 1, dpr: dpr);
+    });
+
+    test('StrokeRect2', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterStrokeRect2());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(10));
+      expect(pCanvas.height, equals(10));
+
+      await _checkDataUrl(pCanvas, 'Rect4');
+
+      var pixels = await pCanvas.pixels;
+      print(pixels);
+
+      expect(pixels.length, equals(10 * 10));
+
+      final dpr = 1;
+
+      expectPixel(pixels, x: 0, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 0, y: 9, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 9, t: 40, dpr: dpr);
+
+      expectPixel(pixels, x: 1, y: 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 8, y: 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 8, y: 8, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 1, y: 8, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 - 1, y: 3 - 1, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 4, y: 3 - 1, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 4, y: 3 + 4, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 - 1, y: 3 + 4, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 2, y: 3 + 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 1, y: 3 + 2, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, t: 1, dpr: dpr);
+    });
+
+    test('StrokeRect3', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterStrokeRect3());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(10));
+      expect(pCanvas.height, equals(10));
+
+      await _checkDataUrl(pCanvas, 'StrokeRect3');
+
+      var pixels = await pCanvas.pixels;
+      print(pixels);
+
+      expect(pixels.length, equals(10 * 10));
+
+      final dpr = 1;
+
+      expectPixel(pixels, x: 0, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 0, y: 9, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 9, t: 40, dpr: dpr);
+
+      expectPixel(pixels, x: 1, y: 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 1, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 9, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 1, y: 9, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3, y: 3 + 3, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 - 1, y: 3 - 1, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 5, y: 3 - 1, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 5, y: 3 + 5, r: 255, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 - 1, y: 3 + 5, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 + 2, y: 3 + 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 5 + 1, y: 3 - 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 + 5 + 1, y: 3 + 2, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 3 - 2, y: 3 + 1, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3 + 5 - 3, y: 3 + 5 - 3, t: 1, dpr: dpr);
+    });
+
+    test('Circle1', () async {
+      var pCanvas = PCanvas(10, 10, MyPainterCircle1());
+
+      print(pCanvas);
+
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(10));
+      expect(pCanvas.height, equals(10));
+
+      await _checkDataUrl(pCanvas, 'Circle1');
+
+      var pixels = await pCanvas.pixels;
+      print(pixels);
+
+      expect(pixels.length, equals(10 * 10));
+
+      final dpr = 1;
+
+      expectPixel(pixels, x: 0, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 0, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 0, y: 9, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 9, y: 9, t: 40, dpr: dpr);
+
+      expectPixel(pixels, x: 5 - 4, y: 5, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 5 + 4, y: 5, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 5, y: 5 - 4, t: 1, dpr: dpr);
+      expectPixel(pixels, x: 5, y: 5 + 4, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 5, y: 5, r: 255, t: 40, dpr: dpr);
+
+      expectPixel(pixels, x: 5 - 2, y: 5, r: 255, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 5 + 2, y: 5, r: 255, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 5, y: 5 - 2, r: 255, t: 40, dpr: dpr);
+      expectPixel(pixels, x: 5, y: 5 + 2, r: 255, t: 40, dpr: dpr);
+    });
+
+    test('PCanvasPanel2D', () async {
+      var pCanvas = PCanvas(100, 50, MyPainterFlood2());
+
+      print(pCanvas);
+
+      var panel1 = PCanvasPanel2D(
+          x: 4,
+          y: 8,
+          width: 20,
+          height: 10,
+          style: PColor.colorGreen.toStyle());
+
+      var rect1 = PRectangleElement(
+          x: 2, y: 2, width: 8, height: 4, style: PColor.colorRed.toStyle());
+
+      panel1.addElement(rect1);
+
+      pCanvas.addElement(panel1);
+
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(100));
+      expect(pCanvas.height, equals(50));
+
+      await _checkDataUrl(pCanvas, 'PCanvasPanel2D');
+
+      var pixels = await pCanvas.pixels;
+      print(pixels);
+
+      expect(pixels.length, equals(100 * 50));
+
+      final dpr = 1;
+
+      expectPixel(pixels, x: 0, y: 0, b: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3, y: 9, b: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 5, y: 9, g: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 5, y: 11, g: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 7, y: 11, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 13, y: 11, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 15, y: 11, g: 255, t: 1, dpr: dpr);
+    });
+
+    test('PCanvasPanel2D (clip)', () async {
+      var pCanvas = PCanvas(100, 50, MyPainterFlood2());
+
+      print(pCanvas);
+
+      var panel1 = PCanvasPanel2D(
+          x: 4,
+          y: 8,
+          width: 20,
+          height: 10,
+          style: PColor.colorGreen.toStyle());
+
+      var rect1 = PRectangleElement(
+          x: -2, y: 2, width: 8, height: 4, style: PColor.colorRed.toStyle());
+
+      panel1.addElement(rect1);
+
+      pCanvas.addElement(panel1);
+
+      await pCanvas.waitLoading();
+      await pCanvas.callPainter();
+
+      expect(pCanvas.painter.isLoadingResources, isFalse);
+
+      expect(pCanvas.width, equals(100));
+      expect(pCanvas.height, equals(50));
+
+      await _checkDataUrl(pCanvas, 'PCanvasPanel2D (clip)');
+
+      var pixels = await pCanvas.pixels;
+      print(pixels);
+
+      expect(pixels.length, equals(100 * 50));
+
+      final dpr = 1;
+
+      expectPixel(pixels, x: 0, y: 0, b: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 3, y: 9, b: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 5, y: 9, g: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 5, y: 11, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 7, y: 11, r: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 12, y: 11, g: 255, t: 1, dpr: dpr);
+
+      expectPixel(pixels, x: 13, y: 11, g: 255, t: 1, dpr: dpr);
     });
   });
+}
+
+Future<void> _checkDataUrl(PCanvas pCanvas, String title) async {
+  print('$title:');
+  var dataUrl = await pCanvas.toDataUrl();
+  print(dataUrl);
+  expect(dataUrl, startsWith('data:image/png;base64,iV'));
 }
 
 class MyPainterFlood1 extends PCanvasPainter {
@@ -375,7 +658,7 @@ class MyPainterFlood2 extends PCanvasPainter {
   }
 }
 
-class MyPainterRect1 extends PCanvasPainter {
+class MyPainterFillRectRed extends PCanvasPainter {
   @override
   FutureOr<bool> paint(PCanvas pCanvas) {
     pCanvas.clear(style: PStyle(color: PColor.colorBlack));
@@ -386,12 +669,56 @@ class MyPainterRect1 extends PCanvasPainter {
   }
 }
 
-class MyPainterRect2 extends PCanvasPainter {
+class MyPainterFillRectBlue extends PCanvasPainter {
   @override
   FutureOr<bool> paint(PCanvas pCanvas) {
     pCanvas.clear(style: PStyle(color: PColor.colorBlack));
 
     pCanvas.fillRect(0, 0, 1, 3, PStyle(color: PColor.colorBlue, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterFillRect3 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.fillRect(3, 3, 4, 4, PStyle(color: PColor.colorRed, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterStrokeRect1 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.strokeRect(3, 3, 4, 4, PStyle(color: PColor.colorRed, size: 1));
+
+    return true;
+  }
+}
+
+class MyPainterStrokeRect2 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.strokeRect(3, 3, 4, 4, PStyle(color: PColor.colorRed, size: 2));
+
+    return true;
+  }
+}
+
+class MyPainterStrokeRect3 extends PCanvasPainter {
+  @override
+  FutureOr<bool> paint(PCanvas pCanvas) {
+    pCanvas.clear(style: PStyle(color: PColor.colorBlack));
+
+    pCanvas.strokeRect(3, 3, 5, 5, PStyle(color: PColor.colorRed, size: 3));
 
     return true;
   }
@@ -451,5 +778,58 @@ class MyPainterText1 extends PCanvasPainter {
     pCanvas.drawText(text, 0, 0, font, style);
 
     return true;
+  }
+}
+
+void expectPixel(PCanvasPixels pixels,
+    {required num x,
+    required num y,
+    int r = 0,
+    int g = 0,
+    int b = 0,
+    double a = 1,
+    required int t,
+    int? tR,
+    int? tG,
+    int? tB,
+    int? tA,
+    // devicePixelRatio:
+    required num? dpr}) {
+  if (dpr != null) {
+    x = x ~/ dpr;
+    y = y ~/ dpr;
+  }
+
+  var pixel = pixels.pixelColor(x.toInt(), y.toInt());
+  var expectedPixel = PColorRGBA(r, g, b, a);
+
+  var dataUrl = pixels.toDataUrl();
+
+  expect(pixel.maxDistance(expectedPixel), inInclusiveRange(0, t),
+      reason:
+          "($x,$y)/$dpr >> pixel:$pixel != expectedPixel:$expectedPixel >> tolerance: $t >> $dataUrl");
+
+  if (tR != null) {
+    expect(pixel.distanceR(expectedPixel), inInclusiveRange(0, tR),
+        reason:
+            "($x,$y)/$dpr >> pixel:$pixel !=(R) expectedPixel:$expectedPixel >> toleranceR: $tR >> $dataUrl");
+  }
+
+  if (tG != null) {
+    expect(pixel.distanceG(expectedPixel), inInclusiveRange(0, tG),
+        reason:
+            "($x,$y)/$dpr >> pixel:$pixel !=(G) expectedPixel:$expectedPixel >> toleranceG: $tG >> $dataUrl");
+  }
+
+  if (tB != null) {
+    expect(pixel.distanceB(expectedPixel), inInclusiveRange(0, tB),
+        reason:
+            "($x,$y)/$dpr >> pixel:$pixel !=(B) expectedPixel:$expectedPixel >> toleranceB: $tB >> $dataUrl");
+  }
+
+  if (tA != null) {
+    expect(pixel.distanceA(expectedPixel), inInclusiveRange(0, tA),
+        reason:
+            "($x,$y)/$dpr >> pixel:$pixel !=(A) expectedPixel:$expectedPixel >> toleranceA: $tA >> $dataUrl");
   }
 }
