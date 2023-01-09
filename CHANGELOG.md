@@ -1,3 +1,13 @@
+## 1.0.7
+
+- `PCanvasPainter`:
+  - Added `zIndex` to define the painter layer. Previously was fixed to `0`.
+- Added `PCanvasFactory`:
+  - Allows extra platform dependent implementations:
+    - `pixelsToPNG` and `pixelsToDataUrl`
+- `PCanvasBitmap.toPNG`:
+  - Ensure `singleFrame: true`
+
 ## 1.0.6
 
 - `PCanvas`:
