@@ -135,6 +135,12 @@ abstract class PCanvasPainter {
     _pCanvas = pCanvas;
   }
 
+  /// Returns the `z-index` of the painter layer. Default: 0
+  ///
+  /// - Elements with [PCanvasElement.zIndex] `<` than [zIndex] will be painted before the painter layer.
+  /// - Elements with [PCanvasElement.zIndex] `>=` than [zIndex] will be painted after the painter layer.
+  int get zIndex => 0;
+
   FutureOr<bool>? _loadingFuture;
 
   /// Waits the [loadResources].
@@ -260,6 +266,27 @@ class PCanvasPainterDummy extends PCanvasPainter {
   FutureOr<bool> paint(PCanvas pCanvas) => true;
 }
 
+abstract class PCanvasFactory {
+  PCanvasFactory.impl();
+
+  factory PCanvasFactory() {
+    return createPCanvasFactoryImpl();
+  }
+
+  PCanvas createPCanvas(int width, int height, PCanvasPainter painter,
+      {PCanvasPixels? initialPixels});
+
+  FutureOr<Uint8List> pixelsToPNG(PCanvasPixels pixels) {
+    var pCanvas = pixels.toPCanvas();
+    return pCanvas.toPNG();
+  }
+
+  FutureOr<String> pixelsToDataUrl(PCanvasPixels pixels) {
+    var pCanvas = pixels.toPCanvas();
+    return pCanvas.toDataUrl();
+  }
+}
+
 typedef PaintFuntion = FutureOr<bool> Function(PCanvas pCanvas);
 
 /// Portable Canvas.
@@ -288,8 +315,8 @@ abstract class PCanvas
 
   factory PCanvas(int width, int height, PCanvasPainter painter,
       {PCanvasPixels? initialPixels}) {
-    return createPCanvasImpl(width, height, painter,
-        initialPixels: initialPixels);
+    return PCanvasFactory()
+        .createPCanvas(width, height, painter, initialPixels: initialPixels);
   }
 
   /// Sets the canvas pixels.
@@ -519,6 +546,9 @@ abstract class PCanvas
   }
 
   FutureOr<bool> _callPainterImpl() {
+    final painter = this.painter;
+    final painterZIndex = painter.zIndex;
+
     var hasElements = _elements.isNotEmpty;
 
     List<PCanvasElement>? elementsPrev;
@@ -527,16 +557,14 @@ abstract class PCanvas
     if (hasElements) {
       elementsPrev = _elements.where((e) {
         var zIndex = e.zIndex;
-        return zIndex != null && zIndex < 0;
+        return zIndex != null && zIndex < painterZIndex;
       }).toList();
 
       elementsPos = _elements.where((e) {
         var zIndex = e.zIndex;
-        return zIndex == null || zIndex >= 0;
+        return zIndex == null || zIndex >= painterZIndex;
       }).toList();
     }
-
-    final painter = this.painter;
 
     FutureOr<bool> ret = true;
 
@@ -1033,15 +1061,9 @@ abstract class PCanvasPixels {
     return pCanvas;
   }
 
-  FutureOr<Uint8List> toPNG() {
-    var pCanvas = toPCanvas();
-    return pCanvas.toPNG();
-  }
+  FutureOr<Uint8List> toPNG() => PCanvasFactory().pixelsToPNG(this);
 
-  FutureOr<String> toDataUrl() {
-    var pCanvas = toPCanvas();
-    return pCanvas.toDataUrl();
-  }
+  FutureOr<String> toDataUrl() => PCanvasFactory().pixelsToDataUrl(this);
 
   @override
   String toString() {
