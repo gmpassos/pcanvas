@@ -6,7 +6,9 @@ import 'package:dio/dio.dart';
 import 'package:image/image.dart' as img;
 
 import 'pcanvas_base.dart';
+import 'pcanvas_color.dart';
 import 'pcanvas_bitmap_extension.dart';
+import 'pcanvas_element.dart';
 
 /// An in-memory [PCanvas] implementation.
 class PCanvasBitmap extends PCanvas {
@@ -61,6 +63,29 @@ class PCanvasBitmap extends PCanvas {
   FutureOr<bool> waitLoading() => painter.waitLoading();
 
   @override
+  void setCursor(PCanvasCursor cursor) {}
+
+  @override
+  PCanvasCursor getCursor() => PCanvasCursor.cursor;
+
+  @override
+  PRectangle get boundingBox => PRectangle(0, 0, width, height);
+
+  @override
+  PCanvasClickEvent toInnerClickEvent(PCanvasClickEvent event,
+          {PCanvasElement? targetElement, PCanvas? pCanvas}) =>
+      event.copyWith(targetElement: targetElement, pCanvas: pCanvas);
+
+  @override
+  PCanvasElement? get asPCanvasElement => null;
+
+  @override
+  PCanvas get asPCanvas => this;
+
+  @override
+  PCanvas get pCanvas => this;
+
+  @override
   num get elementWidth => width;
 
   @override
@@ -86,11 +111,26 @@ class PCanvasBitmap extends PCanvas {
   Future<bool>? _requestedPaint;
 
   @override
+  bool get isPaintRequested => _requestedPaint != null;
+
+  @override
   Future<bool> requestRepaint() {
     var requestedPaint = _requestedPaint;
     if (requestedPaint != null) return requestedPaint;
 
     return _requestedPaint = refresh();
+  }
+
+  @override
+  Future<bool> requestRepaintDelayed(Duration delay) {
+    var requestedPaint = _requestedPaint;
+    if (requestedPaint != null) return requestedPaint;
+
+    if (delay.inMilliseconds == 0) {
+      return _requestedPaint = refresh();
+    } else {
+      return _requestedPaint = Future.delayed(delay, refresh);
+    }
   }
 
   @override
