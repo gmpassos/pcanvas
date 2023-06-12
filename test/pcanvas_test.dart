@@ -571,14 +571,14 @@ void main() {
       print(pCanvas);
 
       var panel1 = PCanvasPanel2D(
-          x: 4,
-          y: 8,
-          width: 20,
-          height: 10,
+          pos: Point(4, 8),
+          dimension: PDimension(20, 10),
           style: PColor.colorGreen.toStyle());
 
       var rect1 = PRectangleElement(
-          x: 2, y: 2, width: 8, height: 4, style: PColor.colorRed.toStyle());
+          pos: Point(2, 2),
+          dimension: PDimension(8, 4),
+          style: PColor.colorRed.toStyle());
 
       panel1.addElement(rect1);
 
@@ -622,14 +622,14 @@ void main() {
       print(pCanvas);
 
       var panel1 = PCanvasPanel2D(
-          x: 4,
-          y: 8,
-          width: 20,
-          height: 10,
+          pos: Point(4, 8),
+          dimension: PDimension(20, 10),
           style: PColor.colorGreen.toStyle());
 
       var rect1 = PRectangleElement(
-          x: -2, y: 2, width: 8, height: 4, style: PColor.colorRed.toStyle());
+          pos: Point(-2, 2),
+          dimension: PDimension(8, 4),
+          style: PColor.colorRed.toStyle());
 
       panel1.addElement(rect1);
 

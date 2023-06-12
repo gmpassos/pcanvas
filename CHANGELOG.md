@@ -1,3 +1,53 @@
+## 1.1.0
+
+- `PCanvasEvent`:
+  - Added `preventDefault`
+- `PCanvasClickEvent`:
+  - Added `copyWith` and `copyWith`.
+- `PCanvasKeyEvent`:
+  - Added `copyWith`.
+
+- `PColor`: added support to HSV.
+
+- `PCanvasPainter`:
+  - Added `onClickMove`.
+  - Added `dispatchOnClick...` and `dispatchOnKey...`.
+
+- Added `PCanvasCursor`.
+
+- `PCanvas`:
+  - Added `setCursor` and `getCursor`.
+  - Added `requestRepaintDelayed`, `getElement` and `elementsLength`.
+  - Added `onPaint`.
+  - Added `preventEventDefault`.
+
+- Added `DynamicDimension`, `DynamicPosition`
+
+- Added `CubicCurveTo`.
+
+- `PCanvasElement`:
+  - Now implements `WithJson`.
+  - Added `onClick...` and `onKey...`.
+
+- Added `PCanvasGridPanel2D` and `PCanvasBackgroundGradient`.
+
+- New `PGraphic`, `Graphic`, `GPanel`, `GRectangle`, `GLine`, `GSvg` and `GSVGPath`.
+
+- `PCanvasHTML`:
+  - Fix `checkDimension`: avoid a loop of dimension modifications and checks.
+  - Fix `set subClip`.
+  - `_drawPath`: add support to `CubicCurveTo` (usef by `GSVG`).
+
+- sdk: '>=3.0.0 <4.0.0'
+- collection: ^1.17.1
+- dio: ^5.1.2
+- image: ^4.0.17
+- path_parsing: ^1.0.1
+- xml: ^6.3.0
+- lints: ^2.1.0
+- test: ^1.24.2
+- coverage: ^1.6.3
+
 ## 1.0.7
 
 - `PCanvasPainter`:

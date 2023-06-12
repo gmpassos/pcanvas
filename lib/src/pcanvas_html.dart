@@ -3,6 +3,57 @@ import 'dart:html';
 import 'dart:typed_data';
 
 import 'pcanvas_base.dart';
+import 'pcanvas_color.dart';
+import 'pcanvas_element.dart';
+
+extension PCanvasCursorCSSExtension on PCanvasCursor {
+  String get cssCursor {
+    switch (this) {
+      case PCanvasCursor.cursor:
+        return 'default';
+      case PCanvasCursor.pointer:
+        return 'pointer';
+      case PCanvasCursor.grab:
+        return 'grab';
+      case PCanvasCursor.crosshair:
+        return 'crosshair';
+      case PCanvasCursor.text:
+        return 'text';
+      case PCanvasCursor.wait:
+        return 'wait';
+      case PCanvasCursor.zoomIn:
+        return 'zoom-in';
+      case PCanvasCursor.zoomOut:
+        return 'zoom-out';
+    }
+  }
+}
+
+PCanvasCursor parsePCanvasCursorFromCSSCursor(String? cssCursor) {
+  if (cssCursor == null) return PCanvasCursor.cursor;
+  cssCursor = cssCursor.trim().toLowerCase();
+
+  switch (cssCursor) {
+    case '':
+      return PCanvasCursor.cursor;
+    case 'pointer':
+      return PCanvasCursor.pointer;
+    case 'grab':
+      return PCanvasCursor.grab;
+    case 'crosshair':
+      return PCanvasCursor.crosshair;
+    case 'text':
+      return PCanvasCursor.text;
+    case 'wait':
+      return PCanvasCursor.wait;
+    case 'zoom-in':
+      return PCanvasCursor.zoomIn;
+    case 'zoom-out':
+      return PCanvasCursor.zoomOut;
+    default:
+      return PCanvasCursor.cursor;
+  }
+}
 
 extension CanvasElementExtension on CanvasElement {
   PCanvasHTML? get pCanvas => PCanvasHTML.getPCanvasFromCanvasElement(this);
@@ -17,7 +68,7 @@ class PCanvasHTML extends PCanvas {
 
     for (var c in canvas) {
       var pCanvas = c.pCanvas;
-      pCanvas?.callPainter();
+      pCanvas?.requestRepaint();
     }
   });
 
@@ -58,6 +109,7 @@ class PCanvasHTML extends PCanvas {
     _setFillStyle(PStyle(color: PColor.colorWhite));
 
     _canvas.onMouseDown.listen(_onMouseDown);
+    _canvas.onMouseMove.listen(_onMouseMove);
     _canvas.onMouseUp.listen(_onMouseUp);
     _canvas.onClick.listen(_onClick);
 
@@ -70,6 +122,16 @@ class PCanvasHTML extends PCanvas {
 
     _setup();
     _initialize(initialPixels);
+  }
+
+  @override
+  bool preventEventDefault(PCanvasEvent event) {
+    var nativeEvent = event.nativeEvent;
+    if (nativeEvent is Event) {
+      nativeEvent.preventDefault();
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -89,6 +151,31 @@ class PCanvasHTML extends PCanvas {
   }
 
   @override
+  void setCursor(PCanvasCursor cursor) =>
+      _canvas.style.cursor = cursor.cssCursor;
+
+  @override
+  PCanvasCursor getCursor() =>
+      parsePCanvasCursorFromCSSCursor(_canvas.style.cursor);
+
+  @override
+  PRectangle get boundingBox => PRectangle(0, 0, width, height);
+
+  @override
+  PCanvasClickEvent toInnerClickEvent(PCanvasClickEvent event,
+          {PCanvasElement? targetElement, PCanvas? pCanvas}) =>
+      event.copyWith(targetElement: targetElement, pCanvas: pCanvas);
+
+  @override
+  PCanvasElement? get asPCanvasElement => null;
+
+  @override
+  PCanvas? get asPCanvas => this;
+
+  @override
+  PCanvas? get pCanvas => this;
+
+  @override
   num get elementWidth => _canvas.client.width;
 
   @override
@@ -105,11 +192,22 @@ class PCanvasHTML extends PCanvas {
   @override
   set pixelRatio(num pr) {
     if (_pixelRatio != pr) {
+      var n = pr.toInt();
+      if (n != pr) {
+        var pr2 = double.tryParse(pr.toStringAsFixed(4));
+        pr = pr2 ?? pr;
+      }
+
       _pixelRatio = pr;
       checkDimension();
       refresh();
     }
   }
+
+  int _checkDimensionWidth = 0;
+  int _checkDimensionHeight = 0;
+  int _checkDimensionClientWidth = 0;
+  int _checkDimensionClientHeight = 0;
 
   bool _checkingDimension = false;
 
@@ -118,26 +216,48 @@ class PCanvasHTML extends PCanvas {
     if (_checkingDimension) return;
     _checkingDimension = true;
 
-    final canvas = _canvas;
+    try {
+      final canvas = _canvas;
 
-    var cW = canvas.clientWidth;
-    var cH = canvas.clientHeight;
+      var canvasClientW = canvas.clientWidth;
+      var canvasClientH = canvas.clientHeight;
 
-    if (cW != 0 && cH != 0) {
-      var w = canvas.width ?? 0;
-      var h = canvas.height ?? 0;
+      if (canvasClientW != 0 && canvasClientH != 0) {
+        var canvasW = canvas.width ?? 0;
+        var canvasH = canvas.height ?? 0;
 
-      var cWpr = (cW * _pixelRatio).toInt();
-      var cHpr = (cH * _pixelRatio).toInt();
+        // Already checked dimension (avoid cyclical checking):
+        if (_checkDimensionWidth == canvasW &&
+            _checkDimensionHeight == canvasH &&
+            _checkDimensionClientWidth == canvasClientW &&
+            _checkDimensionClientHeight == canvasClientH) {
+          return;
+        }
 
-      if (w != cWpr || h != cHpr) {
-        canvas.width = cWpr;
-        canvas.height = cHpr;
-        _clearSetStates();
+        var canvasWpr = (canvasClientW * _pixelRatio).toInt();
+        var canvasHpr = (canvasClientH * _pixelRatio).toInt();
+
+        if (canvasW != canvasWpr || canvasH != canvasHpr) {
+          canvas.width = canvasWpr;
+          canvas.height = canvasHpr;
+
+          print(
+              'checkDimension> $canvasW x $canvasH -> $canvasWpr x $canvasHpr');
+
+          var cW2 = canvas.clientWidth;
+          var cH2 = canvas.clientHeight;
+
+          _checkDimensionWidth = canvasWpr;
+          _checkDimensionHeight = canvasHpr;
+          _checkDimensionClientWidth = cW2;
+          _checkDimensionClientHeight = cH2;
+
+          _clearSetStates();
+        }
       }
+    } finally {
+      _checkingDimension = false;
     }
-
-    _checkingDimension = false;
   }
 
   @override
@@ -169,6 +289,8 @@ class PCanvasHTML extends PCanvas {
 
   Future<bool>? _requestedPaint;
 
+  bool get isPaintRequested => _requestedPaint != null;
+
   @override
   Future<bool> requestRepaint() {
     var requestedPaint = _requestedPaint;
@@ -178,26 +300,42 @@ class PCanvasHTML extends PCanvas {
   }
 
   @override
+  Future<bool> requestRepaintDelayed(Duration delay) {
+    var requestedPaint = _requestedPaint;
+    if (requestedPaint != null) return requestedPaint;
+
+    if (delay.inMilliseconds == 0) {
+      return _requestedPaint = refresh();
+    } else {
+      return _requestedPaint = Future.delayed(delay, refresh);
+    }
+  }
+
+  @override
   void onPosPaint() {
     _requestedPaint = null;
   }
 
-  void _onMouseDown(MouseEvent mEvent) =>
-      painter.onClickDown(mEvent.toEvent('onMouseDown'));
+  void _onMouseDown(MouseEvent mEvent) => painter.dispatchOnClickDown(
+      mEvent.toEvent('onClickDown', pixelRatio: pixelRatio));
 
-  void _onMouseUp(MouseEvent mEvent) =>
-      painter.onClickDown(mEvent.toEvent('onMouseUp'));
+  void _onMouseMove(MouseEvent mEvent) => painter.dispatchOnClickMove(
+      mEvent.toEvent('onClickMove', pixelRatio: pixelRatio));
 
-  void _onClick(MouseEvent mEvent) =>
-      painter.onClick(mEvent.toEvent('onClick'));
+  void _onMouseUp(MouseEvent mEvent) => painter
+      .dispatchOnClickUp(mEvent.toEvent('onClickUp', pixelRatio: pixelRatio));
+
+  void _onClick(MouseEvent mEvent) => painter
+      .dispatchOnClick(mEvent.toEvent('onClick', pixelRatio: pixelRatio));
 
   void _onKeyDown(KeyboardEvent kEvent) =>
-      painter.onKeyDown(kEvent.toEvent('onKeyDown'));
+      painter.dispatchOnKeyDown(kEvent.toEvent('onKeyDown'));
 
   void _onKeyUp(KeyboardEvent kEvent) =>
-      painter.onKeyUp(kEvent.toEvent('onKeyUp'));
+      painter.dispatchOnKeyUp(kEvent.toEvent('onKeyUp'));
 
-  void _onKey(KeyboardEvent kEvent) => painter.onKey(kEvent.toEvent('onKey'));
+  void _onKey(KeyboardEvent kEvent) =>
+      painter.dispatchOnKey(kEvent.toEvent('onKey'));
 
   @override
   CanvasElement get canvasNative => _canvas;
@@ -269,9 +407,7 @@ class PCanvasHTML extends PCanvas {
 
     var prevClip = clip;
     if (prevClip == null) {
-      var clipPath = clip2.asPath2D;
-      _ctx.clip(clipPath);
-      _clip = clip2;
+      clip = clip2;
     } else {
       var subClip = prevClip.intersection(clip2);
       var clipPath = subClip.asPath2D;
@@ -562,7 +698,7 @@ class PCanvasHTML extends PCanvas {
   void fillPath(List path, PStyle style, {bool closePath = false}) {
     if (path.isEmpty) return;
 
-    _setStrokeStyle(style);
+    _setFillStyle(style);
     _drawPath(path, closePath);
 
     _ctx.fill();
@@ -607,6 +743,24 @@ class PCanvasHTML extends PCanvas {
           e = transform.point(e);
           e = canvasPoint(e);
           _ctx.lineTo(e.x, e.y);
+        } else if (e is CubicCurveTo) {
+          var x1 = canvasX(transform.x(e.controlPoint1X));
+          var y1 = canvasX(transform.y(e.controlPoint1Y));
+          var x2 = canvasX(transform.x(e.controlPoint2X));
+          var y2 = canvasX(transform.y(e.controlPoint2Y));
+          var x3 = canvasX(transform.x(e.x));
+          var y3 = canvasX(transform.y(e.y));
+
+          _ctx.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+        } else if (e is List<num>) {
+          var x1 = canvasX(transform.x(e[0]));
+          var y1 = canvasX(transform.y(e[1]));
+          var x2 = canvasX(transform.x(e[2]));
+          var y2 = canvasX(transform.y(e[3]));
+          var x3 = canvasX(transform.x(e[4]));
+          var y3 = canvasX(transform.y(e[5]));
+
+          _ctx.bezierCurveTo(x1, y1, x2, y2, x3, y3);
         } else {
           throw ArgumentError(
               "Can't stroke path point of type: ${e.runtimeType}");
@@ -864,16 +1018,25 @@ class _PCanvasImageElement extends PCanvasImage {
 }
 
 extension _MouseEventExtension on MouseEvent {
-  PCanvasClickEvent toEvent(String type) {
+  PCanvasClickEvent toEvent(String type, {num? pixelRatio}) {
     var point = offset;
-    return PCanvasClickEvent(type, point.x, point.y);
+    var x = point.x;
+    var y = point.y;
+
+    if (pixelRatio != null && pixelRatio != 1) {
+      x = x * pixelRatio;
+      y = y * pixelRatio;
+    }
+
+    return PCanvasClickEvent(type, x, y, nativeEvent: this);
   }
 }
 
 extension _KeyboardEventExtension on KeyboardEvent {
   PCanvasKeyEvent toEvent(String type) {
     return PCanvasKeyEvent(
-        type, charCode, code, key, ctrlKey, altKey, shiftKey, metaKey);
+        type, charCode, code, key, ctrlKey, altKey, shiftKey, metaKey,
+        nativeEvent: this);
   }
 }
 

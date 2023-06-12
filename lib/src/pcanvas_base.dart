@@ -5,8 +5,8 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:pcanvas/pcanvas_bitmap.dart';
+import 'package:pcanvas/src/pcanvas_utils.dart';
 
-import 'pcanvas_element.dart';
 import 'pcanvas_impl_bitmap.dart'
     if (dart.library.html) 'pcanvas_impl_html.dart';
 
@@ -14,10 +14,32 @@ import 'pcanvas_impl_bitmap.dart'
 ///
 /// See [PCanvasClickEvent].
 abstract class PCanvasEvent {
+  /// The [PCanvas] processing this event.
+  final PCanvas? pCanvas;
+
+  /// The event received by the parent element.
+  final PCanvasEvent? parentEvent;
+
   /// The event type.
   final String type;
 
-  const PCanvasEvent(this.type);
+  /// The target [PCanvasElement] of this event.
+  final PCanvasElement? targetElement;
+
+  /// The native event object.
+  final Object? nativeEvent;
+
+  /// The parent [PCanvasElement] of this event. See [parentEvent].
+  PCanvasElement? get parentElement => parentEvent?.targetElement;
+
+  const PCanvasEvent(this.type,
+      {this.parentEvent, this.targetElement, this.pCanvas, this.nativeEvent});
+
+  /// Prevents [PCanvasEvent.nativeEvent] default behavior if [pCanvas] parameter or field is provided.
+  bool preventDefault([PCanvas? pCanvas]) {
+    pCanvas ??= this.pCanvas;
+    return pCanvas?.preventEventDefault(this) ?? false;
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -28,6 +50,33 @@ abstract class PCanvasEvent {
 
   @override
   int get hashCode => type.hashCode;
+
+  String toInfoString(
+      {bool withParentEvents = true, bool withType = true, String indent = ''});
+
+  void _appendTargetInfo(StringBuffer s) {
+    final targetElement = this.targetElement;
+    if (targetElement != null) {
+      s.write('@');
+      s.write(targetElement);
+    }
+  }
+
+  void _appendParentInfo(StringBuffer s, bool withParentEvents, String indent) {
+    if (withParentEvents) {
+      final parentEvent = this.parentEvent;
+      if (parentEvent != null) {
+        s.write('\n$indent<- ');
+        s.write(parentEvent.toInfoString(withType: false, indent: '$indent  '));
+      } else {
+        final pCanvas = this.pCanvas;
+        if (pCanvas != null) {
+          s.write('\n$indent^- ');
+          s.write(pCanvas);
+        }
+      }
+    }
+  }
 }
 
 /// A [PCanvas] click event.
@@ -39,7 +88,41 @@ class PCanvasClickEvent extends PCanvasEvent {
   /// The event Y coordinate.
   final num y;
 
-  const PCanvasClickEvent(super.type, this.x, this.y) : super();
+  const PCanvasClickEvent(super.type, this.x, this.y,
+      {PCanvasClickEvent? parentEvent,
+      super.targetElement,
+      super.pCanvas,
+      super.nativeEvent})
+      : super(parentEvent: parentEvent);
+
+  @override
+  PCanvasClickEvent? get parentEvent => super.parentEvent as PCanvasClickEvent?;
+
+  /// Copies this instance overwriting with the passed parameters.
+  PCanvasClickEvent copyWith(
+          {String? type,
+          num? x,
+          num? y,
+          PCanvasElement? targetElement,
+          PCanvasClickEvent? parentEvent,
+          PCanvas? pCanvas}) =>
+      PCanvasClickEvent(type ?? this.type, x ?? this.x, y ?? this.y,
+          targetElement: targetElement ?? this.targetElement,
+          parentEvent: parentEvent ?? this.parentEvent,
+          pCanvas: pCanvas ?? this.pCanvas,
+          nativeEvent: nativeEvent);
+
+  /// Translates this event coordinates.
+  PCanvasClickEvent translate(num translateX, num translateY,
+          {PCanvasElement? targetElement, PCanvas? pCanvas}) =>
+      PCanvasClickEvent(type, x + translateX, y + translateY,
+          targetElement: targetElement,
+          parentEvent: this,
+          pCanvas: pCanvas ?? this.pCanvas,
+          nativeEvent: nativeEvent);
+
+  /// The [x], [y] coordinates.
+  Point get point => Point(x, y);
 
   @override
   bool operator ==(Object other) =>
@@ -47,6 +130,7 @@ class PCanvasClickEvent extends PCanvasEvent {
       super == other &&
           other is PCanvasClickEvent &&
           runtimeType == other.runtimeType &&
+          type == other.type &&
           x == other.x &&
           y == other.y;
 
@@ -54,9 +138,27 @@ class PCanvasClickEvent extends PCanvasEvent {
   int get hashCode => super.hashCode ^ x.hashCode ^ y.hashCode;
 
   @override
-  String toString() {
-    return 'PCanvasClickEvent{type: $type, x: $x, y: $y}';
+  String toInfoString(
+      {bool withParentEvents = true,
+      bool withType = true,
+      String indent = ''}) {
+    var s = StringBuffer();
+
+    if (withType) {
+      s.write('[$type]');
+    }
+
+    s.write('($x , $y)');
+
+    _appendTargetInfo(s);
+    _appendParentInfo(s, withParentEvents, indent);
+
+    return s.toString();
   }
+
+  @override
+  String toString({bool withParentEvents = true}) =>
+      'PCanvasClickEvent${toInfoString(withParentEvents: withParentEvents)}';
 }
 
 /// A [PCanvas] key event.
@@ -84,8 +186,42 @@ class PCanvasKeyEvent extends PCanvasEvent {
   final bool metaKey;
 
   const PCanvasKeyEvent(super.type, this.charCode, this.code, this.key,
-      this.ctrlKey, this.altKey, this.shiftKey, this.metaKey)
-      : super();
+      this.ctrlKey, this.altKey, this.shiftKey, this.metaKey,
+      {PCanvasKeyEvent? parentEvent,
+      super.targetElement,
+      super.pCanvas,
+      super.nativeEvent})
+      : super(parentEvent: parentEvent);
+
+  @override
+  PCanvasKeyEvent? get parentEvent => super.parentEvent as PCanvasKeyEvent?;
+
+  /// Copies this instance overwriting with the passed parameters.
+  PCanvasKeyEvent copyWith(
+          {String? type,
+          int? charCode,
+          String? code,
+          String? key,
+          bool? ctrlKey,
+          bool? altKey,
+          bool? shiftKey,
+          bool? metaKey,
+          PCanvasElement? targetElement,
+          PCanvasKeyEvent? parentEvent,
+          PCanvas? pCanvas}) =>
+      PCanvasKeyEvent(
+          type ?? this.type,
+          charCode ?? this.charCode,
+          code ?? this.code,
+          key ?? this.key,
+          ctrlKey ?? this.ctrlKey,
+          altKey ?? this.altKey,
+          shiftKey ?? this.shiftKey,
+          metaKey ?? this.metaKey,
+          targetElement: targetElement ?? this.targetElement,
+          parentEvent: parentEvent ?? this.parentEvent,
+          pCanvas: pCanvas ?? this.pCanvas,
+          nativeEvent: nativeEvent);
 
   @override
   bool operator ==(Object other) =>
@@ -113,15 +249,35 @@ class PCanvasKeyEvent extends PCanvasEvent {
       metaKey.hashCode;
 
   @override
-  String toString() {
+  String toInfoString(
+      {bool withParentEvents = true,
+      bool withType = true,
+      String indent = ''}) {
+    var s = StringBuffer();
+
+    if (withType) {
+      s.write('[$type]');
+    }
+
     var extra = [
       if (shiftKey) 'SHIFT',
       if (ctrlKey) 'CTRL',
       if (altKey) 'ALT',
       if (metaKey) 'META',
     ];
-    return 'PCanvasKeyEvent{type: $type, key: <$key>, charCode: $charCode, code: <$code>}${extra.isNotEmpty ? '$extra' : ''}';
+
+    s.write(
+        '{type: $type, key: <$key>, charCode: $charCode, code: <$code>}${extra.isNotEmpty ? '$extra' : ''}');
+
+    _appendTargetInfo(s);
+    _appendParentInfo(s, withParentEvents, indent);
+
+    return s.toString();
   }
+
+  @override
+  String toString({bool withParentEvents = true}) =>
+      'PCanvasKeyEvent${toInfoString(withParentEvents: withParentEvents)}';
 }
 
 /// [PCanvas] painter base class.
@@ -238,6 +394,9 @@ abstract class PCanvasPainter {
   /// Canvas `onClickDown` handler.
   void onClickDown(PCanvasClickEvent event) {}
 
+  /// Canvas `onClickMove` handler.
+  void onClickMove(PCanvasClickEvent event) {}
+
   /// Canvas `onClickUp` handler.
   void onClickUp(PCanvasClickEvent event) {}
 
@@ -252,6 +411,48 @@ abstract class PCanvasPainter {
 
   /// Canvas `onKey` handler.
   void onKey(PCanvasKeyEvent event) {}
+
+  /// Processes [event] and calls [onClickDown].
+  void dispatchOnClickDown(PCanvasClickEvent event) {
+    var event2 = pCanvas?.dispatchOnClickDown(event) ?? event;
+    onClickDown(event2);
+  }
+
+  /// Processes [event] and calls [onClickMove].
+  void dispatchOnClickMove(PCanvasClickEvent event) {
+    var event2 = pCanvas?.dispatchOnClickMove(event) ?? event;
+    onClickMove(event2);
+  }
+
+  /// Processes [event] and calls [onClickUp].
+  void dispatchOnClickUp(PCanvasClickEvent event) {
+    pCanvas?.dispatchOnClickUp(event);
+    onClickUp(event);
+  }
+
+  /// Processes [event] and calls [onClick].
+  void dispatchOnClick(PCanvasClickEvent event) {
+    pCanvas?.dispatchOnClick(event);
+    onClick(event);
+  }
+
+  /// Processes [event] and calls [onKeyDown].
+  void dispatchOnKeyDown(PCanvasKeyEvent event) {
+    pCanvas?.dispatchOnKeyDown(event);
+    onKeyDown(event);
+  }
+
+  /// Processes [event] and calls [onKeyUp].
+  void dispatchOnKeyUp(PCanvasKeyEvent event) {
+    pCanvas?.dispatchOnKeyUp(event);
+    onKeyUp(event);
+  }
+
+  /// Processes [event] and calls [onKey].
+  void dispatchOnKey(PCanvasKeyEvent event) {
+    pCanvas?.dispatchOnKey(event);
+    onKey(event);
+  }
 }
 
 /// A dummy [PCanvasPainter] implementation that won't perform any operation.
@@ -287,7 +488,18 @@ abstract class PCanvasFactory {
   }
 }
 
-typedef PaintFuntion = FutureOr<bool> Function(PCanvas pCanvas);
+typedef PaintFunction = FutureOr<bool> Function(PCanvas pCanvas);
+
+enum PCanvasCursor {
+  cursor,
+  pointer,
+  grab,
+  crosshair,
+  text,
+  wait,
+  zoomIn,
+  zoomOut,
+}
 
 /// Portable Canvas.
 abstract class PCanvas
@@ -434,6 +646,20 @@ abstract class PCanvas
     }
   }
 
+  /// Sets the [PCanvas] cursor.
+  /// - Same as `this.cursor = cursor`.
+  /// - See [cursor].
+  void setCursor(PCanvasCursor cursor);
+
+  /// Returns the [PCanvas] cursor.
+  /// - See [cursor].
+  PCanvasCursor getCursor();
+
+  set cursor(PCanvasCursor cursor) => setCursor(cursor);
+
+  /// The [PCanvas] cursor.
+  PCanvasCursor get cursor => getCursor();
+
   final List<PCanvasElement> _elements = <PCanvasElement>[];
 
   @override
@@ -441,11 +667,20 @@ abstract class PCanvas
       UnmodifiableListView<PCanvasElement>(_elements);
 
   @override
+  PCanvasElement getElement(int index) => _elements[index];
+
+  @override
+  int get elementsLength => _elements.length;
+
+  @override
   bool get hasElements => _elements.isNotEmpty;
 
   @override
   void clearElements() {
     if (_elements.isNotEmpty) {
+      for (var e in _elements) {
+        e.parent = null;
+      }
       _elements.clear();
       requestRepaint();
     }
@@ -454,6 +689,8 @@ abstract class PCanvas
   @override
   void addElement(PCanvasElement element) {
     _elements.add(element);
+    element.parent = this;
+
     _elements.sortByZIndex();
     requestRepaint();
   }
@@ -462,6 +699,7 @@ abstract class PCanvas
   bool removeElement(PCanvasElement element) {
     var rm = _elements.remove(element);
     if (rm) {
+      element.parent = null;
       requestRepaint();
     }
     return rm;
@@ -527,17 +765,39 @@ abstract class PCanvas
       if (ret is Future<bool>) {
         return ret.whenComplete(() {
           _painting = false;
-          onPosPaint();
+          _callOnPosPaint();
         });
       } else {
         _painting = false;
-        onPosPaint();
+        _callOnPosPaint();
         return ret;
       }
     } catch (e) {
       _painting = false;
-      onPosPaint();
+      _callOnPosPaint();
       rethrow;
+    }
+  }
+
+  final StreamController<PCanvas> _onPaintController =
+      StreamController<PCanvas>();
+  late final Stream<PCanvas> _onPaintStream =
+      _onPaintController.stream.asBroadcastStream();
+
+  Stream<PCanvas> get onPaint => _onPaintStream;
+
+  void _callOnPosPaint() {
+    Object? error;
+    try {
+      onPosPaint();
+    } catch (e) {
+      error = e;
+    }
+
+    _onPaintController.add(this);
+
+    if (error != null) {
+      throw error;
     }
   }
 
@@ -593,7 +853,11 @@ abstract class PCanvas
 
   void onPosPaint() {}
 
+  /// Requests a [refresh] (repaint).
   Future<bool> requestRepaint();
+
+  /// Same as [requestRepaint] but ensures a [delay] before [refresh].
+  Future<bool> requestRepaintDelayed(Duration delay);
 
   /// Refreshes the canvas asynchronously.
   Future<bool> refresh() => Future.microtask(callPainter);
@@ -844,6 +1108,9 @@ abstract class PCanvas
 
     return url.toString();
   }
+
+  /// Prevents [PCanvasEvent.nativeEvent] default behavior.
+  bool preventEventDefault(PCanvasEvent event) => false;
 }
 
 class PCanvasState {
@@ -1092,7 +1359,7 @@ class PCanvasPixelsARGB extends PCanvasPixels {
       PCanvasPixelsARGB.blank(width, height);
 
   @override
-  int formatColor(PColor color) => color.argb;
+  int formatColor(PColor color) => color.argbInt;
 
   @override
   PColorRGB parseColor(int pixel) => PColorRGBA.fromARGB(pixel);
@@ -1164,7 +1431,7 @@ class PCanvasPixelsABGR extends PCanvasPixels {
       PCanvasPixelsABGR.blank(width, height);
 
   @override
-  int formatColor(PColor color) => color.abgr;
+  int formatColor(PColor color) => color.abgrInt;
 
   @override
   PColorRGB parseColor(int pixel) => PColorRGBA.fromABGR(pixel);
@@ -1236,7 +1503,7 @@ class PCanvasPixelsRGBA extends PCanvasPixels {
       PCanvasPixelsRGBA.blank(width, height);
 
   @override
-  int formatColor(PColor color) => color.rgba;
+  int formatColor(PColor color) => color.rgbaInt;
 
   @override
   PColorRGB parseColor(int pixel) => PColorRGBA.fromRGBA(pixel);
@@ -1336,232 +1603,7 @@ abstract class PCanvasImage {
   }
 }
 
-/// A [PCanvas] color.
-abstract class PColor {
-  static final PColorRGB colorRed = PColorRGB(255, 0, 0);
-  static final PColorRGB colorGreen = PColorRGB(0, 255, 0);
-  static final PColorRGB colorBlue = PColorRGB(0, 0, 255);
-
-  static final PColorRGB colorYellow = PColorRGB(255, 255, 0);
-  static final PColorRGB colorPink = PColorRGB(255, 0, 255);
-
-  static final PColorRGB colorWhite = PColorRGB(255, 255, 255);
-  static final PColorRGB colorGrey = PColorRGB(128, 128, 128);
-  static final PColorRGB colorBlack = PColorRGB(0, 0, 0);
-
-  static final PColorRGB colorTransparent = PColorRGBA(0, 0, 0, 0.0);
-
-  /// Returns `true` if this color has alpha.
-  bool get hasAlpha;
-
-  /// Converts this intances to a [PColorRGB].
-  PColorRGB toPColorRGB();
-
-  /// Converts this intances to a [PColorRGBA].
-  PColorRGBA toPColorRGBA();
-
-  PColorRGB copyWith({int? r, int? g, int? b, double? alpha});
-
-  /// Converts to the `RGB` format.
-  String toRGB();
-
-  /// Converts to the `RGBA` format.
-  String toRGBA();
-
-  /// This color in `ARGB` format.
-  int get argb;
-
-  /// This color in `ABGR` format.
-  int get abgr;
-
-  /// This color in `RGBA` format.
-  int get rgba;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PColor && toString() == other.toString();
-
-  @override
-  int get hashCode => toString().hashCode;
-}
-
-class PColorRGB extends PColor {
-  /// The read value.
-  final int r;
-
-  /// The green value.
-  final int g;
-
-  /// The blue value.
-  final int b;
-
-  PColorRGB(int r, int g, int b)
-      : r = r.clamp(0, 255),
-        g = g.clamp(0, 255),
-        b = b.clamp(0, 255);
-
-  PColorRGB.fromRGB(int p)
-      : this(
-          (p >> 16) & 0xff,
-          (p >> 8) & 0xff,
-          (p) & 0xff,
-        );
-
-  PColorRGB.fromRGBA(int p)
-      : this(
-          (p >> 24) & 0xff,
-          (p >> 16) & 0xff,
-          (p >> 8) & 0xff,
-        );
-
-  PColorRGB.fromBGR(int p)
-      : this(
-          (p) & 0xff,
-          (p >> 8) & 0xff,
-          (p >> 16) & 0xff,
-        );
-
-  @override
-  bool get hasAlpha => false;
-
-  int get a => 255;
-
-  int maxDistance(PColorRGB other) {
-    var rd = (r - other.r).abs();
-    var gd = (g - other.g).abs();
-    var bd = (b - other.b).abs();
-    var ad = (a - other.a).abs();
-
-    return math.max(rd, math.max(gd, math.max(bd, ad)));
-  }
-
-  int distanceR(PColorRGB other) => (r - other.r).abs();
-
-  int distanceG(PColorRGB other) => (g - other.g).abs();
-
-  int distanceB(PColorRGB other) => (b - other.b).abs();
-
-  int distanceA(PColorRGB other) => (a - other.a).abs();
-
-  @override
-  PColorRGB toPColorRGB() => this;
-
-  @override
-  PColorRGBA toPColorRGBA() => PColorRGBA(r, g, b, 1);
-
-  @override
-  PColorRGB copyWith({int? r, int? g, int? b, double? alpha}) {
-    if (alpha != null) {
-      return PColorRGBA(r ?? this.r, g ?? this.g, b ?? this.b, alpha);
-    } else {
-      return PColorRGB(r ?? this.r, g ?? this.g, b ?? this.b);
-    }
-  }
-
-  String? _rgb;
-
-  @override
-  String toRGB() => _rgb ??= 'rgb($r,$g,$b)';
-
-  @override
-  String toRGBA() => toRGB();
-
-  @override
-  int get argb =>
-      ((255 & 0xff) << 24) |
-      ((r & 0xff) << 16) |
-      ((g & 0xff) << 8) |
-      (b & 0xff);
-
-  @override
-  int get abgr =>
-      ((255 & 0xff) << 24) |
-      ((b & 0xff) << 16) |
-      ((g & 0xff) << 8) |
-      (r & 0xff);
-
-  @override
-  int get rgba =>
-      ((r & 0xff) << 24) | ((g & 0xff) << 16) | ((b & 0xff) << 8) | (255);
-
-  @override
-  String toString() => toRGB();
-
-  PStyle toStyle({int? size}) => PStyle(color: this, size: size);
-}
-
-class PColorRGBA extends PColorRGB {
-  /// The alpha value.
-  final double alpha;
-
-  PColorRGBA(super.r, super.g, super.b, double a)
-      : alpha = ((a.clamp(0, 1) * 10000).toInt() / 10000);
-
-  PColorRGBA.fromARGB(int p)
-      : this(
-          (p >> 16) & 0xff,
-          (p >> 8) & 0xff,
-          (p) & 0xff,
-          ((p >> 24) & 0xff) / 255,
-        );
-
-  PColorRGBA.fromABGR(int p)
-      : this(
-          (p) & 0xff,
-          (p >> 8) & 0xff,
-          (p >> 16) & 0xff,
-          ((p >> 24) & 0xff) / 255,
-        );
-
-  PColorRGBA.fromRGBA(int p)
-      : this(
-          (p >> 24) & 0xff,
-          (p >> 16) & 0xff,
-          (p >> 8) & 0xff,
-          ((p) & 0xff) / 255,
-        );
-
-  @override
-  bool get hasAlpha => alpha != 1.0;
-
-  int? _a;
-
-  @override
-  int get a => _a ??= (alpha * 255).toInt();
-
-  @override
-  PColorRGB toPColorRGB() => PColorRGB(r, g, b);
-
-  @override
-  PColorRGBA toPColorRGBA() => this;
-
-  @override
-  PColorRGB copyWith({int? r, int? g, int? b, double? alpha}) =>
-      PColorRGBA(r ?? this.r, g ?? this.g, b ?? this.b, alpha ?? this.alpha);
-
-  String? _rgba;
-
-  @override
-  String toRGBA() => _rgba ??= 'rgba($r,$g,$b,$alpha)';
-
-  @override
-  int get argb =>
-      ((a & 0xff) << 24) | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
-
-  @override
-  int get abgr =>
-      ((a & 0xff) << 24) | ((b & 0xff) << 16) | ((g & 0xff) << 8) | (r & 0xff);
-
-  @override
-  int get rgba =>
-      ((r & 0xff) << 24) | ((g & 0xff) << 16) | ((b & 0xff) << 8) | (a & 0xff);
-
-  @override
-  String toString() => hasAlpha ? toRGBA() : toRGB();
-}
-
-class PStyle {
+class PStyle implements WithJson {
   static const PStyle none = PStyle();
 
   final PColor? color;
@@ -1588,9 +1630,45 @@ class PStyle {
 
   @override
   String toString() => 'PStyle{color: $color, size: $size}';
+
+  @override
+  String get className => 'PStyle';
+
+  @override
+  Map<String, dynamic> toJson() {
+    final color = this.color;
+    final size = this.size;
+
+    return {
+      'className': className,
+      if (color != null) 'color': color.toJson(),
+      if (size != null) 'size': size,
+    };
+  }
+
+  factory PStyle.fromJson(Map<String, dynamic> j) => PStyle(
+      color: j.containsKey('color') ? PColor.fromJson(j['color']) : null,
+      size: tryParseInt(j['size']));
 }
 
-abstract class WithDimension {
+abstract mixin class WithJson {
+  String get className;
+
+  Map<String, dynamic> toJson();
+}
+
+extension WithJsonExtension on WithJson {
+  String toJsonEncoded({bool pretty = false}) {
+    var j = toJson();
+    if (pretty) {
+      return JsonEncoder.withIndent('  ').convert(j);
+    } else {
+      return json.encode(j);
+    }
+  }
+}
+
+abstract mixin class WithDimension {
   /// The dimension width.
   num get width;
 
@@ -1614,7 +1692,23 @@ abstract class WithDimension {
 }
 
 /// A [PCanvas] dimension.
-class PDimension with WithDimension {
+class PDimension with WithDimension, WithJson {
+  static PDimension resolveDimension(PDimension? dimension, num? w, num? h,
+      {PCanvasElement? element}) {
+    if (dimension != null) {
+      if (element != null) {
+        PCanvasElement.resolveWithElement(dimension, element);
+      }
+      return dimension;
+    }
+
+    if (w == null || h == null) {
+      throw ArgumentError("Invalid dimension> width: $w ; height: $h");
+    }
+
+    return PDimension(w, h);
+  }
+
   @override
   final num width;
 
@@ -1623,13 +1717,32 @@ class PDimension with WithDimension {
 
   const PDimension(this.width, this.height);
 
+  factory PDimension.square(int size) => PDimension(size, size);
+
   @override
   PDimension get dimension => this;
 
+  PDimension setWidth(num width) => PDimension(width, height);
+
+  PDimension setHeight(num height) => PDimension(width, height);
+
   @override
   String toString() {
-    return 'PDimension{width: $width, height: $height}';
+    return '($width x $height)';
   }
+
+  @override
+  String get className => 'PDimension';
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'className': className,
+        'width': width,
+        'height': height,
+      };
+
+  factory PDimension.fromJson(Map<String, dynamic> j) =>
+      PDimension(parseNum(j['width']), parseNum(j['height']));
 
   @override
   bool operator ==(Object other) =>
@@ -1641,14 +1754,89 @@ class PDimension with WithDimension {
 
   PRectangle toPRectangle({num x = 0, num y = 0}) =>
       PRectangle(x, y, width, height);
+
+  /// Returns a resolved version of this instance.
+  PDimension resolve() => this;
+}
+
+class DynamicDimension implements PDimension {
+  final PDimension Function(PDimension? size) computer;
+
+  DynamicDimension(this.computer);
+
+  PDimension compute() => computer(size).resolve();
+
+  @override
+  PDimension get dimension => compute().dimension;
+
+  @override
+  num get width => compute().width;
+
+  @override
+  num get height => compute().height;
+
+  PDimension? size;
+
+  @override
+  PDimension setWidth(num width) => (size ?? PDimension(0, 0)).setWidth(width);
+
+  @override
+  PDimension setHeight(num height) =>
+      (size ?? PDimension(0, 0)).setHeight(height);
+
+  @override
+  num get area => compute().area;
+
+  @override
+  bool get isZeroDimension => compute().isZeroDimension;
+
+  @override
+  Point get center => compute().center;
+
+  @override
+  double get aspectRation => compute().aspectRation;
+
+  @override
+  PRectangle toPRectangle({num x = 0, num y = 0}) =>
+      compute().toPRectangle(x: x, y: y);
+
+  @override
+  PDimension resolve() => compute();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicDimension &&
+          runtimeType == other.runtimeType &&
+          computer == other.computer;
+
+  @override
+  int get hashCode => computer.hashCode;
+
+  @override
+  String toString() {
+    return 'DynamicDimension{${compute()}';
+  }
+
+  @override
+  String get className => 'DynamicDimension';
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...resolve().toJson(),
+        'className': className,
+        'resolved': true,
+      };
 }
 
 /// A [PCanvas] rectangle.
-class PRectangle extends PDimension {
+class PRectangle extends PDimension implements WithXY {
   /// The X coordinate.
+  @override
   final num x;
 
   /// The Y coordinate.
+  @override
   final num y;
 
   const PRectangle(this.x, this.y, super.width, super.height);
@@ -1709,6 +1897,12 @@ class PRectangle extends PDimension {
   /// The center [Point] of this rectangle.
   @override
   Point get center => Point(x + width ~/ 2, y + height ~/ 2);
+
+  /// Returns [x].
+  num get minX => x;
+
+  /// Returns [y].
+  num get minY => y;
 
   /// Returns: `x + width`
   num get maxX => x + width;
@@ -1783,8 +1977,12 @@ class PRectangle extends PDimension {
   }
 
   PRectangle transform(PcanvasTransform t) {
+    if (t.isZeroTransformation) return this;
     return PRectangle(x + t.translateX, y + t.translateY, width, height);
   }
+
+  @override
+  PRectangle resolve() => super.resolve() as PRectangle;
 
   @override
   bool operator ==(Object other) =>
@@ -1808,6 +2006,20 @@ class PRectangle extends PDimension {
   String toString() {
     return 'PRectangle{x: $x, y: $y, width: $width, height: $height}';
   }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
+      };
+
+  factory PRectangle.fromJson(Map<String, dynamic> j) => PRectangle(
+      parseNum(j['x']),
+      parseNum(j['y']),
+      parseNum(j['width']),
+      parseNum(j['height']));
 }
 
 /// A [PCanvas] text metric.
@@ -1853,7 +2065,7 @@ class PTextMetric extends PDimension {
 
 /// A [PCanvas] font.
 class PFont {
-  /// This `dummy` instance shoudn't be used in paint operations.
+  /// This `dummy` instance shouldn't be used in paint operations.
   static final PFont dummy = PFont('', 0);
 
   /// The family of the font.
@@ -1895,11 +2107,35 @@ class PFont {
   int get hashCode => family.hashCode ^ size.hashCode;
 }
 
-abstract class Position {
+abstract class WithXY {
+  num get x;
+
+  num get y;
+}
+
+abstract class Position implements WithXY, WithJson {
+  static Position resolvePosition(Position? pos, num? x, num? y,
+      {PCanvasElement? element}) {
+    if (pos != null) {
+      if (element != null) {
+        PCanvasElement.resolveWithElement(pos, element);
+      }
+      return pos;
+    }
+
+    if (x == null || y == null) {
+      return Point.pZero;
+    }
+
+    return Point(x, y);
+  }
+
   /// The resolved X coordinate.
+  @override
   num get x;
 
   /// The resolved Y coordinate.
+  @override
   num get y;
 
   /// Sets the X coordinate.
@@ -1907,6 +2143,9 @@ abstract class Position {
 
   /// Sets the Y coordinate.
   Position setY(num y);
+
+  /// Sets the X and Y coordinate.
+  Position setXY(num x, num y);
 
   /// Increments the X coordinate by [n]
   Position incrementX(num n);
@@ -1916,10 +2155,41 @@ abstract class Position {
 
   /// Increments the X,Y coordinates by [nX] and [nY].
   Position incrementXY(num nX, num nY);
+
+  /// Increments the X,Y coordinates by [p].
+  Position increment(WithXY p) => incrementXY(p.x, p.y);
+
+  /// Increments the X,Y coordinates by [p].
+  Position decrement(WithXY p) => incrementXY(-p.x, -p.y);
+
+  /// A resolved version of this instance.
+  /// See [DynamicPoint].
+  Position resolve();
+
+  /// Returns this position as a [Point].
+  Point toPoint();
+
+  @override
+  Map<String, dynamic> toJson();
+
+  factory Position.fromJson(Map<String, dynamic> j) {
+    final className = j['className'] as String;
+
+    switch (className) {
+      case 'Point':
+      case 'DynamicPosition':
+      case 'DynamicElementPosition':
+        return Point.fromJson(j);
+      default:
+        throw StateError("Can't handle JSON with `className`: $className");
+    }
+  }
 }
 
 /// A [PCanvas] point.
-class Point implements Position {
+class Point implements Position, WithJson {
+  static final Point pZero = Point(0, 0);
+
   /// The X coordinate.
   @override
   final num x;
@@ -1934,7 +2204,7 @@ class Point implements Position {
 
   @override
   String toString() {
-    return '($x,$y)';
+    return '($x , $y)';
   }
 
   @override
@@ -1945,10 +2215,13 @@ class Point implements Position {
   int get hashCode => x.hashCode ^ y.hashCode;
 
   @override
-  Position setX(num x) => Point(x, y);
+  Point setX(num x) => Point(x, y);
 
   @override
-  Position setY(num y) => Point(x, y);
+  Point setY(num y) => Point(x, y);
+
+  @override
+  Point setXY(num x, num y) => Point(x, y);
 
   @override
   Point incrementX(num n) => Point(x + n, y);
@@ -1958,6 +2231,33 @@ class Point implements Position {
 
   @override
   Point incrementXY(num nX, num nY) => Point(x + nX, y + nY);
+
+  @override
+  Point increment(WithXY p) => incrementXY(p.x, p.y);
+
+  @override
+  Point decrement(WithXY p) => incrementXY(-p.x, -p.y);
+
+  Point scale(num scaleX, num scaleY) => Point(x * scaleX, y * scaleY);
+
+  @override
+  Point resolve() => this;
+
+  @override
+  Point toPoint() => this;
+
+  @override
+  String get className => 'Point';
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'className': className,
+        'x': x,
+        'y': y,
+      };
+
+  factory Point.fromJson(Map<String, dynamic> j) =>
+      Point(parseNum(j['x']), parseNum(j['y']));
 }
 
 extension ListPointExtension on List<Point> {
@@ -1987,6 +2287,250 @@ extension ListPointExtension on List<Point> {
 
     return PRectangle.fromCoordinates(minX, minY, maxX, maxY);
   }
+
+  PRectangle? get boundingBoxInclusive {
+    var bb = boundingBox;
+    if (bb == null) return null;
+    return PRectangle(bb.x, bb.y, bb.width + 1, bb.height + 1);
+  }
+
+  List<Point> translate(num translateX, num translateY) =>
+      map((p) => p.incrementXY(translateX, translateY)).toList();
+}
+
+class DynamicPosition implements Position {
+  final Point Function(Point translate) computer;
+
+  DynamicPosition(this.computer);
+
+  /// Computes the current value of this instance, calling [computer].
+  Position compute() => computer(translate).resolve();
+
+  @override
+  num get x => compute().x;
+
+  @override
+  num get y => compute().y;
+
+  Point translate = Point(0, 0);
+
+  @override
+  Position incrementX(num n) {
+    translate = translate.incrementX(n);
+    return this;
+  }
+
+  @override
+  Position incrementY(num n) {
+    translate = translate.incrementY(n);
+    return this;
+  }
+
+  @override
+  Position incrementXY(num nX, num nY) {
+    translate = translate.incrementXY(nX, nY);
+    return this;
+  }
+
+  @override
+  Position increment(WithXY p) => incrementXY(p.x, p.y);
+
+  @override
+  Position decrement(WithXY p) => incrementXY(-p.x, -p.y);
+
+  @override
+  Position setX(num x) {
+    translate = translate.setX(x);
+    return this;
+  }
+
+  @override
+  Position setY(num y) {
+    translate = translate.setX(y);
+    return this;
+  }
+
+  @override
+  Position setXY(num x, num y) {
+    translate = Point(x, y);
+    return this;
+  }
+
+  /// Returns the computed version of this instance.
+  /// See [compute].
+  @override
+  Position resolve() => compute();
+
+  @override
+  Point toPoint() => compute().toPoint();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicPosition &&
+          runtimeType == other.runtimeType &&
+          computer == other.computer &&
+          translate == other.translate;
+
+  @override
+  int get hashCode => computer.hashCode ^ translate.hashCode;
+
+  @override
+  String toString() {
+    return 'DynamicPosition{translate: $translate, compute: {$compute()}}';
+  }
+
+  @override
+  String get className => 'DynamicPosition';
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...resolve().toJson(),
+        'className': className,
+        'resolved': true,
+      };
+}
+
+class DynamicElementPosition
+    implements Position, WithElement, WithParentElement {
+  final Point Function(Point translate) Function(DynamicElementPosition o)
+      computerBuilder;
+
+  PCanvasElement? _parent;
+
+  PCanvasElement? _element;
+
+  late Point Function(Point translate) computer;
+
+  DynamicElementPosition(
+      PCanvasElement? parent, PCanvasElement? element, this.computerBuilder)
+      : _parent = parent,
+        _element = element {
+    _buildComputer();
+  }
+
+  factory DynamicElementPosition.center(PCanvasElement? parent,
+      [PCanvasElement? element]) {
+    return DynamicElementPosition(parent, element, (o) {
+      return (Point translate) {
+        var parent = o.parent;
+        var element = o.element;
+
+        if (parent == null || element == null) {
+          return Point.pZero;
+        }
+
+        var pD = parent.dimension;
+        var d = element.dimension;
+
+        num x = (pD.width - d.width) ~/ 2;
+        num y = (pD.height - d.height) ~/ 2;
+
+        if (!translate.isZero) {
+          x += translate.x;
+          y += translate.y;
+        }
+
+        return Point(x, y);
+      };
+    });
+  }
+
+  void _buildComputer() {
+    computer = computerBuilder(this);
+  }
+
+  @override
+  PCanvasElement? get parent => _parent;
+
+  @override
+  set parent(PCanvasElement? parent) {
+    if (!identical(parent, _parent)) {
+      _parent = parent;
+      _buildComputer();
+    }
+  }
+
+  @override
+  PCanvasElement? get element => _element;
+
+  @override
+  set element(PCanvasElement? element) {
+    if (!identical(element, _element)) {
+      _element = element;
+      _buildComputer();
+    }
+  }
+
+  /// Computes the current value of this instance, calling [computer].
+  Point compute() => computer(translate).resolve();
+
+  @override
+  num get x => compute().x;
+
+  @override
+  num get y => compute().y;
+
+  Point translate = Point.pZero;
+
+  @override
+  Position setXY(num x, num y) => translate = Point(x, y);
+
+  @override
+  Position incrementX(num n) => translate = translate.incrementX(n);
+
+  @override
+  Position incrementY(num n) => translate = translate.incrementY(n);
+
+  @override
+  Position incrementXY(num nX, num nY) =>
+      translate = translate.incrementXY(nX, nY);
+
+  @override
+  Position increment(WithXY p) => incrementXY(p.x, p.y);
+
+  @override
+  Position decrement(WithXY p) => incrementXY(-p.x, -p.y);
+
+  @override
+  Position setX(num x) => translate = translate.setX(x);
+
+  @override
+  Position setY(num y) => translate = translate.setX(y);
+
+  /// Returns the computed version of this instance.
+  /// See [compute].
+  @override
+  Position resolve() => compute();
+
+  @override
+  Point toPoint() => compute();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicPosition &&
+          runtimeType == other.runtimeType &&
+          computer == other.computer &&
+          translate == other.translate;
+
+  @override
+  int get hashCode => computer.hashCode ^ translate.hashCode;
+
+  @override
+  String toString() {
+    return 'DynamicPosition{translate: $translate, compute: {$compute()}}';
+  }
+
+  @override
+  String get className => 'DynamicPosition';
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...resolve().toJson(),
+        'className': className,
+        'resolved': true,
+      };
 }
 
 extension ListPCanvasImageExtension on List<PCanvasImage> {
@@ -1997,5 +2541,25 @@ extension ListPCanvasImageExtension on List<PCanvasImage> {
         .toList();
 
     return Future.wait(list);
+  }
+}
+
+/// A Cubic Bezier Curve to [x] [y].
+class CubicCurveTo {
+  num controlPoint1X;
+  num controlPoint1Y;
+
+  num controlPoint2X;
+  num controlPoint2Y;
+
+  num x;
+  num y;
+
+  CubicCurveTo(this.controlPoint1X, this.controlPoint1Y, this.controlPoint2X,
+      this.controlPoint2Y, this.x, this.y);
+
+  @override
+  String toString() {
+    return 'CubicCurveTo{controlPoint1: $controlPoint1X,$controlPoint1Y ; controlPoint2: $controlPoint2X, $controlPoint2Y, xy: $x,$y}';
   }
 }
