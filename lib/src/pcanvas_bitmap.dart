@@ -80,10 +80,10 @@ class PCanvasBitmap extends PCanvas {
   PCanvasElement? get asPCanvasElement => null;
 
   @override
-  PCanvas? get asPCanvas => this;
+  PCanvas get asPCanvas => this;
 
   @override
-  PCanvas? get pCanvas => this;
+  PCanvas get pCanvas => this;
 
   @override
   num get elementWidth => width;
@@ -109,6 +109,9 @@ class PCanvasBitmap extends PCanvas {
   }
 
   Future<bool>? _requestedPaint;
+
+  @override
+  bool get isPaintRequested => _requestedPaint != null;
 
   @override
   Future<bool> requestRepaint() {

@@ -853,6 +853,9 @@ abstract class PCanvas
 
   void onPosPaint() {}
 
+  /// Returns `true` if [requestRepaint] was called and not processed yet.
+  bool get isPaintRequested;
+
   /// Requests a [refresh] (repaint).
   Future<bool> requestRepaint();
 

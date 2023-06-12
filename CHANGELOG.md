@@ -17,7 +17,7 @@
 
 - `PCanvas`:
   - Added `setCursor` and `getCursor`.
-  - Added `requestRepaintDelayed`, `getElement` and `elementsLength`.
+  - Added `requestRepaintDelayed`, `isPaintRequested`, `getElement` and `elementsLength`.
   - Added `onPaint`.
   - Added `preventEventDefault`.
 
