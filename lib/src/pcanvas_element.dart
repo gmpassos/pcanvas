@@ -748,8 +748,7 @@ class PCanvasPanel2D extends PCanvasElement2DBase
         pos: Position.fromJson(j['pos']),
         dimension: PDimension.fromJson(j['dimension']),
         id: j['id'],
-        elements:
-            PCanvasElement2D.fromList(j['elements']).whereNotNull().toList(),
+        elements: PCanvasElement2D.fromList(j['elements']).nonNulls.toList(),
       );
 }
 
@@ -835,9 +834,8 @@ class PCanvasGridPanel2D extends PCanvasPanel2D {
         dimension: PDimension.fromJson(j['dimension']),
         spacing: parseInt(j['spacing']),
         id: j['id'],
-        elements: PCanvasElement2D.fromList(j['elements'] as List)
-            .whereNotNull()
-            .toList(),
+        elements:
+            PCanvasElement2D.fromList(j['elements'] as List).nonNulls.toList(),
       );
 }
 

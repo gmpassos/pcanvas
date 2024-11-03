@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:path_parsing/path_parsing.dart';
 import 'package:xml/xml.dart';
 
@@ -73,7 +72,7 @@ class GSVG extends GPanel {
     var elements = xml.descendantElements
         .expand((e) => _resolveShapes(
             e, strokeColor, strokeSize, fillColor, returnViewBox!))
-        .whereNotNull()
+        .nonNulls
         .toList();
 
     return elements;

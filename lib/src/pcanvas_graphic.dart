@@ -1,8 +1,6 @@
 import 'dart:convert' as dart_convert;
 import 'dart:math' as math;
 
-import 'package:collection/collection.dart';
-
 import 'pcanvas_base.dart';
 import 'pcanvas_color.dart';
 import 'pcanvas_element.dart';
@@ -114,7 +112,7 @@ class PGraphic extends PCanvasElement2DBase {
 abstract class GShape implements WithJson {
   static List<GShape> listFrom(List<Map<String, dynamic>>? jsonList) {
     if (jsonList == null || jsonList.isEmpty) return [];
-    var list = jsonList.map(GShape.from).whereNotNull().toList();
+    var list = jsonList.map(GShape.from).nonNulls.toList();
     return list;
   }
 
