@@ -1,3 +1,15 @@
+## 1.1.1
+
+- collection: ^1.18.0
+- dio: ^5.7.0
+- image: ^4.3.0
+- xml: ^6.4.2
+
+- lints: ^3.0.0
+- test: ^1.25.8
+- dependency_validator: ^3.2.3
+- coverage: ^1.10.0
+
 ## 1.1.0
 
 - `PCanvasEvent`:
