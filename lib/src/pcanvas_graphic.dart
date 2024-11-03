@@ -145,6 +145,9 @@ abstract class GShape implements WithJson {
 
   void translate(Point p);
 
+  /// Scaled version of this [GShape].
+  GShape scaled(double scale);
+
   List<GShape> selectShapesAtPoint(Point p, {bool recursive = false}) {
     if (shapeBoundingBox.containsPoint(p)) {
       return [this];
@@ -245,6 +248,10 @@ class Graphic extends GShape {
   }
 
   @override
+  Graphic scaled(double scale) =>
+      Graphic(width.scaled(scale), height.scaled(scale), shapes.scaled(scale));
+
+  @override
   void paint(PCanvas pCanvas, [GraphicContext? graphicContext]) {
     graphicContext = resolveGraphicContext(graphicContext);
 
@@ -275,7 +282,9 @@ class Graphic extends GShape {
   }
 }
 
-extension ListGShapeExtension on List<GShape> {
+extension ListGShapeExtension<G extends GShape> on List<G> {
+  List<G> scaled(double scale) => map((e) => e.scaled(scale) as G).toList();
+
   List<GShape> selectShapesAtPoint(Point p,
           {bool recursive = false, bool growable = true}) =>
       expand((e) => e.selectShapesAtPoint(p, recursive: recursive))
@@ -310,6 +319,11 @@ class GPanel extends GShape {
     x += p.x.toInt();
     y += p.y.toInt();
   }
+
+  @override
+  GPanel scaled(double scale) => GPanel(x.scaled(scale), y.scaled(scale),
+      width.scaled(scale), height.scaled(scale), elements.scaled(scale),
+      backgroundColor: backgroundColor);
 
   @override
   List<GShape> selectShapesAtPoint(Point p, {bool recursive = false}) {
@@ -410,6 +424,13 @@ class GRectangle extends GShape {
     x += p.x.toInt();
     y += p.y.toInt();
   }
+
+  @override
+  GRectangle scaled(double scale) => GRectangle(x.scaled(scale),
+      y.scaled(scale), width.scaled(scale), height.scaled(scale),
+      strokeSize: strokeSize?.scaled(scale),
+      color: color,
+      backgroundColor: backgroundColor);
 
   @override
   GraphicContext resolveGraphicContext([GraphicContext? parentContext]) => super
@@ -513,6 +534,11 @@ class GLine extends GShape {
     this.y1 = y1;
     this.y2 = y2;
   }
+
+  @override
+  GLine scaled(double scale) => GLine(
+      x1.scaled(scale), y1.scaled(scale), x2.scaled(scale), y2.scaled(scale),
+      size: size.scaled(scale), color: color);
 
   @override
   GraphicContext resolveGraphicContext([GraphicContext? parentContext]) =>
@@ -648,8 +674,59 @@ class GPath extends GShape {
 
         cubic[4] = x3 + x;
         cubic[5] = y3 + y;
+
+        pathPoints2[i] = cubic;
       }
     }
+  }
+
+  @override
+  GPath scaled(double scale) {
+    var pathPoints2 = pathPoints.toList();
+    final length = pathPoints2.length;
+
+    for (var i = 0; i < length; ++i) {
+      var e = pathPoints2[i];
+
+      if (e is num) {
+        var x1 = e;
+        var y1 = pathPoints2[i + 1] as num;
+
+        pathPoints2[i] = x1 * scale;
+        pathPoints2[++i] = y1 * scale;
+      } else if (e is Point) {
+        pathPoints2[i] = e.scale(scale, scale);
+      } else if (e is List<num>) {
+        var cubic = e.toList(growable: false);
+        assert(cubic.length == 6);
+
+        var x1 = cubic[0];
+        var y1 = cubic[1];
+
+        var x2 = cubic[2];
+        var y2 = cubic[3];
+
+        var x3 = cubic[4];
+        var y3 = cubic[5];
+
+        cubic[0] = x1 * scale;
+        cubic[1] = y1 * scale;
+
+        cubic[2] = x2 * scale;
+        cubic[3] = y2 * scale;
+
+        cubic[4] = x3 * scale;
+        cubic[5] = y3 * scale;
+
+        pathPoints2[i] = cubic;
+      }
+    }
+
+    return GPath(pathPoints2,
+        strokeSize: strokeSize?.scaled(scale),
+        strokeColor: strokeColor,
+        fillColor: fillColor,
+        closePath: closePath);
   }
 
   @override
@@ -733,4 +810,8 @@ class GPath extends GShape {
         if (fillColor != null) 'fillColor': fillColor.toString(),
         'closed': closePath,
       };
+}
+
+extension on int {
+  int scaled(double scale) => (this * scale).round();
 }

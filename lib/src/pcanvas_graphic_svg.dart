@@ -233,6 +233,12 @@ class GSVGPath extends GShape {
   }
 
   @override
+  GSVGPath scaled(double scale) => GSVGPath(_paths.scaled(scale),
+      fillColor: fillColor,
+      strokeColor: strokeColor,
+      strokeSize: strokeSize?.scaled(scale));
+
+  @override
   GraphicContext resolveGraphicContext([GraphicContext? parentContext]) => super
       .resolveGraphicContext(parentContext)
       .copyWith(color: strokeColor, backgroundColor: fillColor);
@@ -499,4 +505,8 @@ class _SVGViewBox {
   String toString() {
     return '_SVGViewBox{svg: $svgWidth x $svgHeight ; viewBox: $x, $y , $width x $height}';
   }
+}
+
+extension on int {
+  int scaled(double scale) => (this * scale).round();
 }

@@ -1,5 +1,8 @@
 ## 1.1.1
 
+- `GShape`:
+  - Added `scaled(double scale)`;
+
 - collection: ^1.18.0
 - dio: ^5.7.0
 - image: ^4.3.0
