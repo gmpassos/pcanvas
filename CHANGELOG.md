@@ -51,7 +51,7 @@
 - `PCanvasHTML`:
   - Fix `checkDimension`: avoid a loop of dimension modifications and checks.
   - Fix `set subClip`.
-  - `_drawPath`: add support to `CubicCurveTo` (usef by `GSVG`).
+  - `_drawPath`: add support to `CubicCurveTo` (used by `GSVG`).
 
 - sdk: '>=3.0.0 <4.0.0'
 - collection: ^1.17.1
