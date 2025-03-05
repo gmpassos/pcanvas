@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:web_utils/web_utils.dart';
+import 'package:web_utils/web_utils.dart'
+    hide IterableIntExtension, IterableNumExtension;
 
 import 'pcanvas_base.dart';
 import 'pcanvas_color.dart';
@@ -148,10 +149,12 @@ class PCanvasHTML extends PCanvas {
     var pixelsData = pixels.pixels;
     var pixelsDataBuffer = pixelsData.buffer;
 
-    var bytes = pixelsDataBuffer.asUint8ClampedList(
+    Uint8ClampedList bytes = pixelsDataBuffer.asUint8ClampedList(
         pixelsData.offsetInBytes, pixelsData.lengthInBytes);
 
-    var imageData = ImageData(bytes.toJS, pixels.width, pixels.height.toJS);
+    JSUint8ClampedArray data = bytes.toJS;
+
+    var imageData = ImageData(data, pixels.width, pixels.height.toJS);
 
     _ctx.putImageData(imageData, x, y, 0, 0, pixels.width, pixels.height);
   }
