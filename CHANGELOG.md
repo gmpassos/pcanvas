@@ -1,3 +1,22 @@
+## 1.1.2
+
+- `PCanvasPainter`:
+  - `refresh`: return `Future<bool>`.
+  - `requestRepaint` and `requestRepaintDelayed`.
+
+- sdk: '>=3.6.0 <4.0.0'
+
+- collection: ^1.19.0
+- dio: ^5.8.0+1
+- image: ^4.5.3
+- path_parsing: ^1.1.0
+- xml: ^6.5.0
+
+- lints: ^5.1.1
+- test: ^1.25.15
+- dependency_validator: ^5.0.2
+- coverage: ^1.11.1
+
 ## 1.1.1
 
 - `GShape`:

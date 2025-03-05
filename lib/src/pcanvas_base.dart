@@ -343,7 +343,15 @@ abstract class PCanvasPainter {
   FutureOr<bool> loadResources(PCanvas pCanvas) => true;
 
   /// Refreshes the canvas of this painter.
-  void refresh() => _pCanvas?.refresh();
+  Future<bool> refresh() => _pCanvas?.refresh() ?? Future.value(false);
+
+  /// Requests a [refresh] (repaint).
+  Future<bool> requestRepaint(Duration delay) =>
+      _pCanvas?.requestRepaint() ?? Future.value(false);
+
+  /// Same as [requestRepaint] but ensures a [delay] before [refresh].
+  Future<bool> requestRepaintDelayed(Duration delay) =>
+      _pCanvas?.requestRepaintDelayed(delay) ?? Future.value(false);
 
   /// Clears the canvas.
   void clear(PCanvas pCanvas) {

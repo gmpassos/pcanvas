@@ -1,5 +1,5 @@
 /// Portable canvas library.
-library pcanvas;
+library;
 
 export 'src/pcanvas_base.dart';
 export 'src/pcanvas_color.dart';

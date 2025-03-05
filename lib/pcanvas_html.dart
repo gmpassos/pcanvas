@@ -1,5 +1,5 @@
 /// Portable canvas library (Web implementation).
-library pcanvas.html;
+library;
 
 export 'pcanvas.dart';
 export 'src/pcanvas_html.dart';
