@@ -1,7 +1,7 @@
 import 'dart:async';
-// ignore: deprecated_member_use
-import 'dart:html';
 import 'dart:typed_data';
+
+import 'package:web_utils/web_utils.dart';
 
 import 'pcanvas_base.dart';
 import 'pcanvas_color.dart';
@@ -56,48 +56,52 @@ PCanvasCursor parsePCanvasCursorFromCSSCursor(String? cssCursor) {
   }
 }
 
-extension CanvasElementExtension on CanvasElement {
+extension CanvasElementExtension on HTMLCanvasElement {
   PCanvasHTML? get pCanvas => PCanvasHTML.getPCanvasFromCanvasElement(this);
 }
 
 class PCanvasHTML extends PCanvas {
-  static final ResizeObserver _resizeObserver =
-      ResizeObserver((entries, observer) {
-    var canvas = entries
-        .map((e) => e is ResizeObserverEntry ? e.target : e)
-        .whereType<CanvasElement>();
+  static final ResizeObserver _resizeObserver = ResizeObserver(
+    (JSArray<ResizeObserverEntry> entries, ResizeObserver observer) {
+      var canvas = entries
+          .toIterable()
+          .map((e) => e.isA<ResizeObserverEntry>() ? e.target : e)
+          .where((e) => e.asJSAny.isA<HTMLCanvasElement>());
 
-    for (var c in canvas) {
-      var pCanvas = c.pCanvas;
-      pCanvas?.requestRepaint();
-    }
-  });
+      for (var c in canvas) {
+        var pCanvas = c.pCanvas;
+        pCanvas?.requestRepaint();
+      }
+    }.toJS,
+  );
 
   static final Expando<PCanvasHTML> _canvasRelations =
       Expando<PCanvasHTML>('PCanvasHTML');
 
-  static PCanvasHTML? getPCanvasFromCanvasElement(CanvasElement canvas) =>
+  static PCanvasHTML? getPCanvasFromCanvasElement(HTMLCanvasElement canvas) =>
       _canvasRelations[canvas];
 
   @override
   final PCanvasPainter painter;
-  late final CanvasElement _canvas;
+  late final HTMLCanvasElement _canvas;
   late final CanvasRenderingContext2D _ctx;
 
   @override
-  num get width => (_canvas.width ?? 0);
+  num get width => _canvas.width;
 
   @override
-  num get height => (_canvas.height ?? 0);
+  num get height => _canvas.height;
 
   late final PCanvasHTMLStateExtra _initialStateExtra;
 
   PCanvasHTML(int width, int height, this.painter,
       {PCanvasPixels? initialPixels})
       : super.impl() {
-    _canvas = CanvasElement(width: width, height: height);
+    _canvas = HTMLCanvasElement()
+      ..width = width
+      ..height = height;
 
-    _ctx = (_canvas.getContext('2d', {'willReadFrequently': true})
+    _ctx = (_canvas.getContext('2d', {'willReadFrequently': true}.toJSDeep)
             as CanvasRenderingContext2D?) ??
         _canvas.context2D;
 
@@ -128,8 +132,9 @@ class PCanvasHTML extends PCanvas {
   @override
   bool preventEventDefault(PCanvasEvent event) {
     var nativeEvent = event.nativeEvent;
-    if (nativeEvent is Event) {
-      nativeEvent.preventDefault();
+    if (nativeEvent.asJSAny.isA<Event>()) {
+      var event = nativeEvent as Event;
+      event.preventDefault();
       return true;
     }
     return false;
@@ -146,7 +151,7 @@ class PCanvasHTML extends PCanvas {
     var bytes = pixelsDataBuffer.asUint8ClampedList(
         pixelsData.offsetInBytes, pixelsData.lengthInBytes);
 
-    var imageData = ImageData(bytes, pixels.width, pixels.height);
+    var imageData = ImageData(bytes.toJS, pixels.width, pixels.height.toJS);
 
     _ctx.putImageData(imageData, x, y, 0, 0, pixels.width, pixels.height);
   }
@@ -177,10 +182,10 @@ class PCanvasHTML extends PCanvas {
   PCanvas get pCanvas => this;
 
   @override
-  num get elementWidth => _canvas.client.width;
+  num get elementWidth => _canvas.clientWidth;
 
   @override
-  num get elementHeight => _canvas.client.height;
+  num get elementHeight => _canvas.clientHeight;
 
   @override
   num get devicePixelRatio => window.devicePixelRatio;
@@ -224,8 +229,8 @@ class PCanvasHTML extends PCanvas {
       var canvasClientH = canvas.clientHeight;
 
       if (canvasClientW != 0 && canvasClientH != 0) {
-        var canvasW = canvas.width ?? 0;
-        var canvasH = canvas.height ?? 0;
+        var canvasW = canvas.width;
+        var canvasH = canvas.height;
 
         // Already checked dimension (avoid cyclical checking):
         if (_checkDimensionWidth == canvasW &&
@@ -263,7 +268,7 @@ class PCanvasHTML extends PCanvas {
 
   @override
   void log(Object? o) {
-    window.console.log(o);
+    window.console.log(o?.jsify());
   }
 
   void _setup() {
@@ -340,7 +345,7 @@ class PCanvasHTML extends PCanvas {
       painter.dispatchOnKey(kEvent.toEvent('onKey'));
 
   @override
-  CanvasElement get canvasNative => _canvas;
+  HTMLCanvasElement get canvasNative => _canvas;
 
   int _imageIdCount = 0;
 
@@ -349,8 +354,18 @@ class PCanvasHTML extends PCanvas {
     var id = ++_imageIdCount;
 
     if (source is String) {
-      var imageElement = ImageElement(src: source, width: width, height: height)
+      var imageElement = HTMLImageElement()
+        ..src = source
         ..crossOrigin = 'anonymous';
+
+      if (width != null) {
+        imageElement.width = width;
+      }
+
+      if (height != null) {
+        imageElement.height = height;
+      }
+
       return _PCanvasImageElement('img_$id', imageElement);
     } else {
       throw ArgumentError("Can't handle image source: $source");
@@ -475,7 +490,7 @@ class PCanvasHTML extends PCanvas {
       if (width == imageWidth && height == imageHeight) {
         _ctx.drawImage(image.imageElement, x, y);
       } else {
-        _ctx.drawImageScaled(image.imageElement, x, y, width, height);
+        _ctx.drawImage(image.imageElement, x, y, width, height);
       }
     } else {
       throw ArgumentError("Can't handle image type: $image");
@@ -502,7 +517,7 @@ class PCanvasHTML extends PCanvas {
       if (width == imageWidth && height == imageHeight) {
         _ctx.drawImage(image.imageElement, x, y);
       } else {
-        _ctx.drawImageScaled(image.imageElement, x, y, width, height);
+        _ctx.drawImage(image.imageElement, x, y, width, height);
       }
     } else {
       throw ArgumentError("Can't handle image type: $image");
@@ -523,8 +538,8 @@ class PCanvasHTML extends PCanvas {
     dstHeight = canvasY(dstHeight);
 
     if (image is _PCanvasImageElement) {
-      _ctx.drawImageScaledFromSource(image.imageElement, srcX, srcY, srcWidth,
-          srcHeight, dstX, dstY, dstWidth, dstHeight);
+      _ctx.drawImage(image.imageElement, srcX, srcY, srcWidth, srcHeight, dstX,
+          dstY, dstWidth, dstHeight);
     } else {
       throw ArgumentError("Can't handle image type: $image");
     }
@@ -657,16 +672,13 @@ class PCanvasHTML extends PCanvas {
 
     var m = _ctx.measureText(text);
 
-    var width = m.width ?? 0;
+    var width = m.width;
 
-    var height =
-        (m.fontBoundingBoxAscent ?? 0) + (m.fontBoundingBoxDescent ?? 0);
+    var height = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
 
-    var actualWidth =
-        (m.actualBoundingBoxLeft ?? 0) + (m.actualBoundingBoxRight ?? 0);
+    var actualWidth = m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
 
-    var actualHeight =
-        (m.actualBoundingBoxAscent ?? 0) + (m.actualBoundingBoxDescent ?? 0);
+    var actualHeight = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
 
     return PTextMetric(width, height, actualWidth, actualHeight);
   }
@@ -799,7 +811,7 @@ class PCanvasHTML extends PCanvas {
     }
 
     _ctx.lineWidth = size;
-    _ctx.strokeStyle = style.color.toString();
+    _ctx.strokeStyle = style.color.toString().toJS;
 
     _lastStrokeStyle = style;
 
@@ -813,7 +825,7 @@ class PCanvasHTML extends PCanvas {
 
     var color = style.color ?? PColor.colorGrey;
 
-    _ctx.fillStyle = color.toString();
+    _ctx.fillStyle = color.toString().toJS;
     _lastFillStyle = style;
   }
 
@@ -830,26 +842,27 @@ class PCanvasHTML extends PCanvas {
 
   @override
   PCanvasPixels get pixels {
-    var w = _canvas.width ?? 0;
-    var h = _canvas.height ?? 0;
+    var w = _canvas.width;
+    var h = _canvas.height;
 
     var imageData = _ctx.getImageData(0, 0, w, h);
 
     return PCanvasPixelsABGR.fromBytes(
-        imageData.width, imageData.height, imageData.data);
+        imageData.width, imageData.height, imageData.data.toDart);
   }
 
   @override
   Future<Uint8List> toPNG() async {
-    var blob = await _canvas.toBlob('image/png');
+    var blob = await _canvas.asBlob(type: 'image/png');
 
     var reader = FileReader();
 
     var completer = Completer<Uint8List>();
 
     reader.onLoadEnd.listen((_) {
-      var result = reader.result as List<int>;
-      var bytes = result is Uint8List ? result : Uint8List.fromList(result);
+      var jsResult = reader.result as JSArrayBuffer;
+      var byteBuffer = jsResult.toDart;
+      var bytes = byteBuffer.asUint8List(0, byteBuffer.lengthInBytes);
       completer.complete(bytes);
     });
 
@@ -927,8 +940,8 @@ class PCanvasHTMLStateExtra extends PCanvasStateExtra {
         imageSmoothingEnabled = ctx.imageSmoothingEnabled;
 
   void setContext(CanvasRenderingContext2D ctx) {
-    ctx.strokeStyle = strokeStyle;
-    ctx.fillStyle = fillStyle;
+    ctx.strokeStyle = (strokeStyle ?? '').toString().toJS;
+    ctx.fillStyle = (fillStyle ?? '').toString().toJS;
     ctx.globalAlpha = globalAlpha;
     ctx.lineWidth = lineWidth;
     ctx.lineCap = lineCap;
@@ -943,8 +956,8 @@ class PCanvasHTMLStateExtra extends PCanvasStateExtra {
     ctx.font = font;
     ctx.textAlign = textAlign;
     ctx.textBaseline = textBaseline;
-    ctx.direction = direction;
-    ctx.imageSmoothingEnabled = imageSmoothingEnabled;
+    ctx.direction = direction ?? '';
+    ctx.imageSmoothingEnabled = imageSmoothingEnabled ?? false;
   }
 
   Map<String, Object?> get properties => <String, Object?>{
@@ -976,7 +989,7 @@ class _PCanvasImageElement extends PCanvasImage {
   @override
   final String id;
 
-  final ImageElement imageElement;
+  final HTMLImageElement imageElement;
 
   _PCanvasImageElement(this.id, this.imageElement) {
     imageElement.id = id;
@@ -987,13 +1000,13 @@ class _PCanvasImageElement extends PCanvasImage {
   String get type => 'html:ImageElement';
 
   @override
-  String get src => imageElement.src!;
+  String get src => imageElement.src;
 
   @override
-  int get width => imageElement.width ?? 0;
+  int get width => imageElement.width;
 
   @override
-  int get height => imageElement.height ?? 0;
+  int get height => imageElement.height;
 
   bool _loaded = false;
 
@@ -1006,7 +1019,7 @@ class _PCanvasImageElement extends PCanvasImage {
   FutureOr<bool> load() {
     if (_loaded) return true;
 
-    if (imageElement.complete ?? false) {
+    if (imageElement.complete) {
       _loaded = true;
       return true;
     }
@@ -1021,9 +1034,8 @@ class _PCanvasImageElement extends PCanvasImage {
 
 extension _MouseEventExtension on MouseEvent {
   PCanvasClickEvent toEvent(String type, {num? pixelRatio}) {
-    var point = offset;
-    var x = point.x;
-    var y = point.y;
+    var x = offsetX;
+    var y = offsetY;
 
     if (pixelRatio != null && pixelRatio != 1) {
       x = x * pixelRatio;

@@ -2,4 +2,4 @@
 library;
 
 export 'pcanvas.dart';
-export 'src/pcanvas_html.dart';
+export 'src/pcanvas_web.dart';
