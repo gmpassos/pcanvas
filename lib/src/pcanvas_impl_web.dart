@@ -9,7 +9,7 @@ class PCanvasFactoryWeb extends PCanvasFactory {
   @override
   PCanvas createPCanvas(int width, int height, PCanvasPainter painter,
           {PCanvasPixels? initialPixels}) =>
-      PCanvasHTML(width, height, painter, initialPixels: initialPixels);
+      PCanvasWeb(width, height, painter, initialPixels: initialPixels);
 }
 
 PCanvasFactory createPCanvasFactoryImpl() => PCanvasFactoryWeb.instance;

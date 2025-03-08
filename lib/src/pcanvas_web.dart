@@ -58,10 +58,10 @@ PCanvasCursor parsePCanvasCursorFromCSSCursor(String? cssCursor) {
 }
 
 extension CanvasElementExtension on HTMLCanvasElement {
-  PCanvasHTML? get pCanvas => PCanvasHTML.getPCanvasFromCanvasElement(this);
+  PCanvasWeb? get pCanvas => PCanvasWeb.getPCanvasFromCanvasElement(this);
 }
 
-class PCanvasHTML extends PCanvas {
+class PCanvasWeb extends PCanvas {
   static final ResizeObserver _resizeObserver = ResizeObserver(
     (JSArray<ResizeObserverEntry> entries, ResizeObserver observer) {
       var canvas = entries
@@ -76,10 +76,10 @@ class PCanvasHTML extends PCanvas {
     }.toJS,
   );
 
-  static final Expando<PCanvasHTML> _canvasRelations =
-      Expando<PCanvasHTML>('PCanvasHTML');
+  static final Expando<PCanvasWeb> _canvasRelations =
+      Expando<PCanvasWeb>('PCanvasHTML');
 
-  static PCanvasHTML? getPCanvasFromCanvasElement(HTMLCanvasElement canvas) =>
+  static PCanvasWeb? getPCanvasFromCanvasElement(HTMLCanvasElement canvas) =>
       _canvasRelations[canvas];
 
   @override
@@ -95,7 +95,7 @@ class PCanvasHTML extends PCanvas {
 
   late final PCanvasHTMLStateExtra _initialStateExtra;
 
-  PCanvasHTML(int width, int height, this.painter,
+  PCanvasWeb(int width, int height, this.painter,
       {PCanvasPixels? initialPixels})
       : super.impl() {
     _canvas = HTMLCanvasElement()

@@ -1,3 +1,8 @@
+## 2.0.0-beta.2
+
+- `pcanvas_web.dart`:
+  - Rename `PCanvasHTML` to `PCanvasWeb`
+
 ## 2.0.0-beta.1
 
 - Added `pcanvas_web.dart` and `pcanvas_impl_web.dart`.
