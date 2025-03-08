@@ -1,3 +1,15 @@
+## 2.0.0-beta.2
+
+- `pcanvas_web.dart`:
+  - Rename `PCanvasHTML` to `PCanvasWeb`
+
+## 2.0.0-beta.1
+
+- Added `pcanvas_web.dart` and `pcanvas_impl_web.dart`.
+  - Implementation using package `web` (`dart:html` is deprecated).
+
+- web_utils: ^1.0.12
+
 ## 1.1.2
 
 - `PCanvasPainter`:
