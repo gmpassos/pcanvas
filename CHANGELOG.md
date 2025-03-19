@@ -1,5 +1,8 @@
 ## 2.0.0-beta.3
 
+- `PCanvasWeb`:
+  - Fix `_resizeObserver` migration.
+
 - web_utils: ^1.0.13
 
 ## 2.0.0-beta.2

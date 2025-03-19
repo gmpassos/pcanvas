@@ -66,8 +66,11 @@ class PCanvasWeb extends PCanvas {
     (JSArray<ResizeObserverEntry> entries, ResizeObserver observer) {
       var canvas = entries
           .toIterable()
-          .map((e) => e.isA<ResizeObserverEntry>() ? e.target : e)
-          .where((e) => e.asJSAny.isA<HTMLCanvasElement>());
+          .map((e) => e.asJSAny.isA<ResizeObserverEntry>()
+              ? (e as ResizeObserverEntry).target
+              : e)
+          .where((e) => e.asJSAny.isA<HTMLCanvasElement>())
+          .cast<HTMLCanvasElement>();
 
       for (var c in canvas) {
         var pCanvas = c.pCanvas;
