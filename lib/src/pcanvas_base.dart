@@ -8,7 +8,7 @@ import 'package:pcanvas/pcanvas_bitmap.dart';
 import 'package:pcanvas/src/pcanvas_utils.dart';
 
 import 'pcanvas_impl_bitmap.dart'
-    if (dart.library.html) 'pcanvas_impl_html.dart';
+    if (dart.library.js_interop) 'pcanvas_impl_web.dart';
 
 /// A [PCanvas] event.
 ///
